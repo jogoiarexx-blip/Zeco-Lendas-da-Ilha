@@ -46,7 +46,7 @@ class FaseScene extends Phaser.Scene {
     this.solids = this.physics.add.staticGroup();
     const ground = this.add.tileSprite(
       lvl.worldWidth / 2, lvl.groundY + (H - lvl.groundY) / 2,
-      lvl.worldWidth, H - lvl.groundY, 'groundTile_' + lvl.theme
+      lvl.worldWidth, H - lvl.groundY, 'groundTile_' + (lvl.theme || 'ilha')
     );
     this.physics.add.existing(ground, true);
     this.solids.add(ground);
@@ -54,7 +54,7 @@ class FaseScene extends Phaser.Scene {
     // ---------- Plataformas móveis (vaivém, senoidal) ----------
     this.movingPlatforms = [];
     for (const p of lvl.platforms) {
-      const plat = this.add.tileSprite(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h, 'platformTile_' + lvl.theme);
+      const plat = this.add.tileSprite(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h, 'platformTile_' + (lvl.theme || 'ilha'));
       this.physics.add.existing(plat, true);
       if (p.move) {
         plat._mp = { baseX: p.x + p.w / 2, baseY: p.y + p.h / 2, axis: p.move.axis, range: p.move.range, speed: p.move.speed, dx: 0, dy: 0 };
@@ -341,8 +341,20 @@ class FaseScene extends Phaser.Scene {
     const left = this.cursors.left.isDown || this.keys.A.isDown;
     const right = this.cursors.right.isDown || this.keys.D.isDown;
     const jumpHeld = this.cursors.up.isDown || this.keys.W.isDown || this.keys.SPACE.isDown;
+    const jumpPressed = jumpHeld && !this.jumpPrev; // borda de subida — só no instante em que aperta
     const wasOnGround = this.onGroundPrev;
     const onGround = body.blocked.down || body.touching.down;
+
+    // Coyote time: continua deixando pular por ~100ms depois de sair da
+    // borda de uma plataforma (senão o jogo parece "não responder" quando
+    // o pulo é apertado um instante tarde demais).
+    if (onGround) this.coyoteMs = 100;
+    else this.coyoteMs = Math.max(0, (this.coyoteMs || 0) - delta);
+
+    // Jump buffering: se apertar o pulo um pouco ANTES de tocar o chão,
+    // guarda esse toque por ~120ms e executa assim que aterrissar.
+    if (jumpPressed) this.jumpBufferMs = 120;
+    else this.jumpBufferMs = Math.max(0, (this.jumpBufferMs || 0) - delta);
 
     const effMax = this.starTimer > 0 ? MAX_SPEED * 1.6 : MAX_SPEED;
 
@@ -367,10 +379,13 @@ class FaseScene extends Phaser.Scene {
     if (this.vx > effMax) this.vx = effMax;
     if (this.vx < -effMax) this.vx = -effMax;
 
-    if (jumpHeld && !this.jumpPrev && onGround) {
+    const canGroundJump = this.coyoteMs > 0;
+    if ((jumpPressed || this.jumpBufferMs > 0) && canGroundJump) {
       body.setVelocityY(JUMP_VEL);
       this.squashY = 1.25; this.squashX = 0.8;
-    } else if (jumpHeld && !this.jumpPrev && !onGround && this.wingTimer > 0 && !this.doubleJumpUsed) {
+      this.coyoteMs = 0;
+      this.jumpBufferMs = 0;
+    } else if (jumpPressed && !onGround && this.wingTimer > 0 && !this.doubleJumpUsed) {
       body.setVelocityY(JUMP_VEL * 0.85);
       this.doubleJumpUsed = true;
       this.flashText(this.player.x, this.player.y, '🪽');
@@ -485,12 +500,12 @@ class FaseScene extends Phaser.Scene {
   }
 
   drawBackground(lvl, theme) {
-    this.add.image(W / 2, H / 2, 'sky_' + lvl.theme).setScrollFactor(0).setDisplaySize(W, H);
+    this.add.image(W / 2, H / 2, 'sky_' + (lvl.theme || 'ilha')).setScrollFactor(0).setDisplaySize(W, H);
     this.add.image(680, 70, theme.sun ? 'sun' : 'moon').setScrollFactor(0);
     const cloudKey = theme.sun ? 'cloud' : 'cloud_night';
     for (let i = 0; i < 16; i++) this.add.image(i * 260 + 80, 80, cloudKey).setScrollFactor(0.3, 0);
-    for (let i = 0; i < 20; i++) this.add.image(i * 220 + 110, H - 35, 'hill_' + lvl.theme).setScrollFactor(0.6, 0).setOrigin(0.5, 1);
-    for (let i = 0; i < 14; i++) this.add.image(i * 300 + 150, H - 150, 'palm_' + lvl.theme).setScrollFactor(0.6, 0).setOrigin(0.5, 1);
+    for (let i = 0; i < 20; i++) this.add.image(i * 220 + 110, H - 35, 'hill_' + (lvl.theme || 'ilha')).setScrollFactor(0.6, 0).setOrigin(0.5, 1);
+    for (let i = 0; i < 14; i++) this.add.image(i * 300 + 150, H - 150, 'palm_' + (lvl.theme || 'ilha')).setScrollFactor(0.6, 0).setOrigin(0.5, 1);
   }
 
   // Gera todas as texturas do jogo via Graphics — sem nenhum arquivo de
@@ -536,80 +551,94 @@ class FaseScene extends Phaser.Scene {
       g.generateTexture('groundTile_' + themeName, 24, 70);
     }
 
-    if (this.textures.exists('sun')) { g.destroy(); return; } // resto já gerado numa fase anterior
+    this._buildCommonTextures(g);
+  }
 
-    g.clear();
-    g.fillStyle(0xfff4be, 0.35); g.fillCircle(70, 70, 70);
-    g.fillStyle(0xfff4be, 0.6); g.fillCircle(70, 70, 45);
-    g.fillStyle(0xfff3b0, 1); g.fillCircle(70, 70, 26);
-    g.generateTexture('sun', 140, 140);
-
-    g.clear();
-    g.fillStyle(0xe6e6ff, 0.5); g.fillCircle(55, 55, 55);
-    g.fillStyle(0xf4f4ff, 1); g.fillCircle(55, 55, 22);
-    g.generateTexture('moon', 110, 110);
-
-    g.clear();
-    g.fillStyle(0xffffff, 0.85);
-    g.fillEllipse(40, 20, 80, 40); g.fillEllipse(70, 15, 60, 36);
-    g.generateTexture('cloud', 110, 45);
-
-    g.clear();
-    g.fillStyle(0xb4b4dc, 0.25);
-    g.fillEllipse(40, 20, 80, 40); g.fillEllipse(70, 15, 60, 36);
-    g.generateTexture('cloud_night', 110, 45);
-
-    g.clear();
-    g.fillStyle(0xd64550, 1);
-    g.fillTriangle(0, 15, 6, 0, 12, 15);
-    g.generateTexture('spikeTile', 12, 15);
-
-    g.clear();
-    g.fillStyle(0xb5772f, 1); g.fillRect(0, 0, 34, 34);
-    g.lineStyle(2, 0x5c3a15, 1); g.strokeRect(1.5, 1.5, 31, 31);
-    g.beginPath(); g.moveTo(4, 4); g.lineTo(30, 30); g.moveTo(30, 4); g.lineTo(4, 30); g.strokePath();
-    g.generateTexture('box', 34, 34);
-
-    g.clear();
-    g.fillStyle(0xc23f77, 1);
-    g.fillTriangle(9, 2, 0, 9, 9, 18); g.fillTriangle(9, 2, 18, 9, 9, 18);
-    g.fillStyle(0xff5fa2, 1);
-    g.fillTriangle(9, 2, 3, 8, 9, 9); g.fillTriangle(9, 2, 15, 8, 9, 9);
-    g.fillStyle(0xffd7e8, 0.9); g.fillTriangle(9, 2, 6, 6, 9, 7);
-    g.generateTexture('gem', 18, 18);
-
-    g.clear();
-    g.fillStyle(0xb9c4cc, 1);
-    g.fillTriangle(13, 2, 0, 13, 13, 26); g.fillTriangle(13, 2, 26, 13, 13, 26);
-    g.fillStyle(0xe8eef2, 1);
-    g.fillTriangle(13, 2, 5, 12, 13, 13); g.fillTriangle(13, 2, 21, 12, 13, 13);
-    g.fillStyle(0xffffff, 0.9); g.fillTriangle(13, 2, 8, 9, 13, 10);
-    g.generateTexture('silverGem', 26, 26);
-
-    g.clear();
-    g.fillStyle(0xffffff, 0.5); g.fillCircle(16, 16, 16);
-    g.generateTexture('glow', 32, 32);
-
-    g.clear();
-    g.fillStyle(0x8fe388, 0.25); g.fillCircle(24, 24, 24);
-    g.lineStyle(2, 0x8fe388, 0.8); g.strokeCircle(24, 24, 22);
-    g.generateTexture('shieldBubble', 48, 48);
-
-    g.clear();
-    g.fillStyle(0xffb703, 0.25); g.fillEllipse(30, 60, 52, 120);
-    g.fillStyle(0xfff2c2, 0.6); g.fillEllipse(30, 60, 30, 90);
-    g.generateTexture('portal', 60, 120);
-
-    g.clear();
-    g.fillStyle(0x5a3f8f, 1); g.fillEllipse(16, 20, 30, 22);
-    g.fillStyle(0x6a4fb0, 1); g.fillEllipse(16, 17, 28, 20);
-    g.fillStyle(0x2a1a45, 1); g.fillRect(9, 27, 5, 6); g.fillRect(18, 27, 5, 6);
-    g.fillStyle(0xffffff, 1); g.fillCircle(21, 13, 7);
-    g.fillStyle(0x1a1a1a, 1); g.fillCircle(23, 13, 3.5);
-    g.generateTexture('enemy', 32, 34);
-
-    this.drawPlayerTexture(g, 'playerRight', 0);
-    this.drawPlayerTexture(g, 'playerWalk', 6);
+  _buildCommonTextures(g) {
+    if (!this.textures.exists('sun')) {
+      g.clear();
+      g.fillStyle(0xfff4be, 0.35); g.fillCircle(70, 70, 70);
+      g.fillStyle(0xfff4be, 0.6); g.fillCircle(70, 70, 45);
+      g.fillStyle(0xfff3b0, 1); g.fillCircle(70, 70, 26);
+      g.generateTexture('sun', 140, 140);
+    }
+    if (!this.textures.exists('moon')) {
+      g.clear();
+      g.fillStyle(0xe6e6ff, 0.5); g.fillCircle(55, 55, 55);
+      g.fillStyle(0xf4f4ff, 1); g.fillCircle(55, 55, 22);
+      g.generateTexture('moon', 110, 110);
+    }
+    if (!this.textures.exists('cloud')) {
+      g.clear();
+      g.fillStyle(0xffffff, 0.85);
+      g.fillEllipse(40, 20, 80, 40); g.fillEllipse(70, 15, 60, 36);
+      g.generateTexture('cloud', 110, 45);
+    }
+    if (!this.textures.exists('cloud_night')) {
+      g.clear();
+      g.fillStyle(0xb4b4dc, 0.25);
+      g.fillEllipse(40, 20, 80, 40); g.fillEllipse(70, 15, 60, 36);
+      g.generateTexture('cloud_night', 110, 45);
+    }
+    if (!this.textures.exists('spikeTile')) {
+      g.clear();
+      g.fillStyle(0xd64550, 1);
+      g.fillTriangle(0, 15, 6, 0, 12, 15);
+      g.generateTexture('spikeTile', 12, 15);
+    }
+    if (!this.textures.exists('box')) {
+      g.clear();
+      g.fillStyle(0xb5772f, 1); g.fillRect(0, 0, 34, 34);
+      g.lineStyle(2, 0x5c3a15, 1); g.strokeRect(1.5, 1.5, 31, 31);
+      g.beginPath(); g.moveTo(4, 4); g.lineTo(30, 30); g.moveTo(30, 4); g.lineTo(4, 30); g.strokePath();
+      g.generateTexture('box', 34, 34);
+    }
+    if (!this.textures.exists('gem')) {
+      g.clear();
+      g.fillStyle(0xc23f77, 1);
+      g.fillTriangle(9, 2, 0, 9, 9, 18); g.fillTriangle(9, 2, 18, 9, 9, 18);
+      g.fillStyle(0xff5fa2, 1);
+      g.fillTriangle(9, 2, 3, 8, 9, 9); g.fillTriangle(9, 2, 15, 8, 9, 9);
+      g.fillStyle(0xffd7e8, 0.9); g.fillTriangle(9, 2, 6, 6, 9, 7);
+      g.generateTexture('gem', 18, 18);
+    }
+    if (!this.textures.exists('silverGem')) {
+      g.clear();
+      g.fillStyle(0xb9c4cc, 1);
+      g.fillTriangle(13, 2, 0, 13, 13, 26); g.fillTriangle(13, 2, 26, 13, 13, 26);
+      g.fillStyle(0xe8eef2, 1);
+      g.fillTriangle(13, 2, 5, 12, 13, 13); g.fillTriangle(13, 2, 21, 12, 13, 13);
+      g.fillStyle(0xffffff, 0.9); g.fillTriangle(13, 2, 8, 9, 13, 10);
+      g.generateTexture('silverGem', 26, 26);
+    }
+    if (!this.textures.exists('glow')) {
+      g.clear();
+      g.fillStyle(0xffffff, 0.5); g.fillCircle(16, 16, 16);
+      g.generateTexture('glow', 32, 32);
+    }
+    if (!this.textures.exists('shieldBubble')) {
+      g.clear();
+      g.fillStyle(0x8fe388, 0.25); g.fillCircle(24, 24, 24);
+      g.lineStyle(2, 0x8fe388, 0.8); g.strokeCircle(24, 24, 22);
+      g.generateTexture('shieldBubble', 48, 48);
+    }
+    if (!this.textures.exists('portal')) {
+      g.clear();
+      g.fillStyle(0xffb703, 0.25); g.fillEllipse(30, 60, 52, 120);
+      g.fillStyle(0xfff2c2, 0.6); g.fillEllipse(30, 60, 30, 90);
+      g.generateTexture('portal', 60, 120);
+    }
+    if (!this.textures.exists('enemy')) {
+      g.clear();
+      g.fillStyle(0x5a3f8f, 1); g.fillEllipse(16, 20, 30, 22);
+      g.fillStyle(0x6a4fb0, 1); g.fillEllipse(16, 17, 28, 20);
+      g.fillStyle(0x2a1a45, 1); g.fillRect(9, 27, 5, 6); g.fillRect(18, 27, 5, 6);
+      g.fillStyle(0xffffff, 1); g.fillCircle(21, 13, 7);
+      g.fillStyle(0x1a1a1a, 1); g.fillCircle(23, 13, 3.5);
+      g.generateTexture('enemy', 32, 34);
+    }
+    if (!this.textures.exists('playerRight')) this.drawPlayerTexture(g, 'playerRight', 0);
+    if (!this.textures.exists('playerWalk')) this.drawPlayerTexture(g, 'playerWalk', 6);
 
     g.destroy();
   }
