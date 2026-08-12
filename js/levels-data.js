@@ -1,14 +1,12 @@
 // =============================================================
-// Dados das fases — copiados de js/fases.js do jogo original,
-// sem alteração no layout (mesmas posições de plataformas, gemas,
-// inimigos, caixas, power-ups etc.).
-// Por enquanto só as fases 1 e 2 (ambas tema "ilha" no original).
-// As fases 3-5 usam temas especiais (gelo/vento/noite) com mecânicas
-// próprias (zonas de gelo escorregadio, vento) — ficam pra quando
-// migrarmos esses sistemas também, pra não misturar tema com física.
+// Dados das fases — Zeco expandido (8 fases)
+// Inimigos: walker | jumper | flyer | charger
+// Temas: ilha | gelo | vento | noite | vulcao | templo
 // =============================================================
 const LEVELS = [
-  { // ---------- Fase 1 ----------
+  { // ---------- Fase 1: Praia das Gemas ----------
+    name: 'Praia das Gemas',
+    theme: 'ilha',
     groundY: 380,
     worldWidth: 2920,
     playerStart: { x: 50, y: 300 },
@@ -27,9 +25,12 @@ const LEVELS = [
       {x:2420,y:280},{x:2600,y:210},{x:2750,y:340},
     ],
     enemies: [
-      {x:600,y:355,range:120,dir:1,baseX:600},{x:1000,y:315,range:80,dir:-1,baseX:1000},
-      {x:1400,y:355,range:150,dir:1,baseX:1400},{x:1750,y:355,range:100,dir:1,baseX:1750},
-      {x:2100,y:355,range:120,dir:-1,baseX:2100},{x:2450,y:355,range:100,dir:1,baseX:2450},
+      {x:600,y:355,range:120,dir:1,baseX:600,type:'walker'},
+      {x:1000,y:315,range:80,dir:-1,baseX:1000,type:'walker'},
+      {x:1400,y:355,range:150,dir:1,baseX:1400,type:'walker'},
+      {x:1750,y:355,range:100,dir:1,baseX:1750,type:'walker'},
+      {x:2100,y:355,range:120,dir:-1,baseX:2100,type:'jumper'},
+      {x:2450,y:355,range:100,dir:1,baseX:2450,type:'walker'},
     ],
     spikes: [
       {x:800,y:365,w:60,h:15},{x:1950,y:365,w:60,h:15},{x:2300,y:365,w:70,h:15},
@@ -50,7 +51,9 @@ const LEVELS = [
     silverGem: {x:2230,y:200},
     checkpoints: [{x:1250,y:380}],
   },
-  { // ---------- Fase 2 ----------
+  { // ---------- Fase 2: Trilha das Palmeiras ----------
+    name: 'Trilha das Palmeiras',
+    theme: 'ilha',
     groundY: 380,
     worldWidth: 3050,
     playerStart: { x: 50, y: 300 },
@@ -71,10 +74,13 @@ const LEVELS = [
       {x:2520,y:300},{x:2700,y:240},{x:2880,y:180},{x:2980,y:340},
     ],
     enemies: [
-      {x:300,y:355,range:100,dir:1,baseX:300},{x:650,y:355,range:130,dir:-1,baseX:650},
-      {x:1150,y:355,range:100,dir:1,baseX:1150},{x:1500,y:355,range:120,dir:-1,baseX:1500},
-      {x:1900,y:355,range:110,dir:1,baseX:1900},{x:2250,y:355,range:130,dir:-1,baseX:2250},
-      {x:2600,y:355,range:100,dir:1,baseX:2600},
+      {x:300,y:355,range:100,dir:1,baseX:300,type:'walker'},
+      {x:650,y:355,range:130,dir:-1,baseX:650,type:'jumper'},
+      {x:1150,y:355,range:100,dir:1,baseX:1150,type:'walker'},
+      {x:1500,y:355,range:120,dir:-1,baseX:1500,type:'walker'},
+      {x:1900,y:355,range:110,dir:1,baseX:1900,type:'jumper'},
+      {x:2250,y:355,range:130,dir:-1,baseX:2250,type:'walker'},
+      {x:2600,y:355,range:100,dir:1,baseX:2600,type:'walker'},
     ],
     spikes: [
       {x:450,y:365,w:70,h:15},{x:990,y:365,w:50,h:15},
@@ -96,7 +102,8 @@ const LEVELS = [
     silverGem: {x:2000,y:130},
     checkpoints: [{x:1600,y:380}],
   },
-  { // ---------- Fase 3: Geleira Escorregadia (gelo) ----------
+  { // ---------- Fase 3: Geleira Escorregadia ----------
+    name: 'Geleira Escorregadia',
     theme: 'gelo',
     groundY: 380,
     worldWidth: 2420,
@@ -117,9 +124,12 @@ const LEVELS = [
       {x:1890,y:270},{x:2090,y:210},{x:2290,y:270},{x:120,y:340},
     ],
     enemies: [
-      {x:520,y:355,range:110,dir:1,baseX:520},{x:900,y:355,range:90,dir:-1,baseX:900},
-      {x:1350,y:355,range:120,dir:1,baseX:1350},{x:1750,y:355,range:100,dir:-1,baseX:1750},
-      {x:2150,y:355,range:100,dir:1,baseX:2150},
+      {x:520,y:355,range:110,dir:1,baseX:520,type:'walker'},
+      {x:900,y:355,range:90,dir:-1,baseX:900,type:'walker'},
+      {x:1350,y:355,range:120,dir:1,baseX:1350,type:'jumper'},
+      {x:1750,y:355,range:100,dir:-1,baseX:1750,type:'walker'},
+      {x:2150,y:355,range:100,dir:1,baseX:2150,type:'walker'},
+      {x:1100,y:200,range:80,dir:1,baseX:1100,type:'flyer'},
     ],
     spikes: [{x:720,y:365,w:60,h:15},{x:1550,y:365,w:60,h:15}],
     boxes: [
@@ -134,7 +144,8 @@ const LEVELS = [
     checkpoints: [{x:1200,y:380}],
     iceZones: [{x:480,w:820},{x:1680,w:420}],
   },
-  { // ---------- Fase 4: Penhascos Ventosos (vento) ----------
+  { // ---------- Fase 4: Penhascos Ventosos ----------
+    name: 'Penhascos Ventosos',
     theme: 'vento',
     groundY: 380,
     worldWidth: 2680,
@@ -154,8 +165,12 @@ const LEVELS = [
       {x:2190,y:260},{x:2410,y:190},{x:2600,y:280},
     ],
     enemies: [
-      {x:280,y:355,range:100,dir:1,baseX:280},{x:1200,y:355,range:120,dir:-1,baseX:1200},
-      {x:1750,y:355,range:100,dir:1,baseX:1750},{x:2250,y:355,range:110,dir:-1,baseX:2250},
+      {x:280,y:355,range:100,dir:1,baseX:280,type:'walker'},
+      {x:1200,y:355,range:120,dir:-1,baseX:1200,type:'walker'},
+      {x:1750,y:355,range:100,dir:1,baseX:1750,type:'jumper'},
+      {x:2250,y:355,range:110,dir:-1,baseX:2250,type:'walker'},
+      {x:700,y:150,range:100,dir:1,baseX:700,type:'flyer'},
+      {x:1600,y:180,range:90,dir:-1,baseX:1600,type:'flyer'},
     ],
     spikes: [{x:650,y:365,w:220,h:15},{x:2050,y:365,w:80,h:15}],
     boxes: [
@@ -169,7 +184,8 @@ const LEVELS = [
     checkpoints: [{x:1350,y:380}],
     windZones: [{x:650,y:0,w:230,h:450,strength:-0.4},{x:2100,y:0,w:280,h:450,strength:0.3}],
   },
-  { // ---------- Fase 5: Caverna da Meia-Noite (noite) ----------
+  { // ---------- Fase 5: Caverna da Meia-Noite ----------
+    name: 'Caverna da Meia-Noite',
     theme: 'noite',
     groundY: 380,
     worldWidth: 2820,
@@ -193,9 +209,14 @@ const LEVELS = [
       {x:150,y:340},{x:2700,y:340},
     ],
     enemies: [
-      {x:340,y:355,range:90,dir:1,baseX:340},{x:760,y:355,range:100,dir:-1,baseX:760},
-      {x:1200,y:355,range:110,dir:1,baseX:1200},{x:1620,y:355,range:90,dir:-1,baseX:1620},
-      {x:2040,y:355,range:100,dir:1,baseX:2040},{x:2460,y:355,range:100,dir:-1,baseX:2460},
+      {x:340,y:355,range:90,dir:1,baseX:340,type:'walker'},
+      {x:760,y:355,range:100,dir:-1,baseX:760,type:'jumper'},
+      {x:1200,y:355,range:110,dir:1,baseX:1200,type:'walker'},
+      {x:1620,y:355,range:90,dir:-1,baseX:1620,type:'charger'},
+      {x:2040,y:355,range:100,dir:1,baseX:2040,type:'walker'},
+      {x:2460,y:355,range:100,dir:-1,baseX:2460,type:'jumper'},
+      {x:900,y:140,range:120,dir:1,baseX:900,type:'flyer'},
+      {x:1800,y:140,range:100,dir:-1,baseX:1800,type:'flyer'},
     ],
     spikes: [{x:500,y:365,w:70,h:15},{x:1400,y:365,w:60,h:15},{x:2250,y:365,w:70,h:15}],
     boxes: [
@@ -211,17 +232,197 @@ const LEVELS = [
     silverGem: {x:1035,y:160},
     checkpoints: [{x:900,y:380},{x:1900,y:380}],
   },
+  { // ---------- Fase 6: Vulcão do Barão ----------
+    name: 'Vulcão do Barão',
+    theme: 'vulcao',
+    groundY: 380,
+    worldWidth: 3100,
+    playerStart: { x: 50, y: 300 },
+    portalX: 3020,
+    platforms: [
+      {x:180,y:310,w:100,h:20},{x:350,y:250,w:90,h:20},
+      {x:520,y:190,w:100,h:20, move:{axis:'y', range:50, speed:1.1}},
+      {x:720,y:280,w:110,h:20},{x:920,y:220,w:90,h:20},
+      {x:1120,y:300,w:120,h:20, move:{axis:'x', range:80, speed:0.85}},
+      {x:1400,y:240,w:100,h:20},{x:1600,y:180,w:90,h:20},
+      {x:1800,y:260,w:110,h:20, move:{axis:'y', range:60, speed:0.95}},
+      {x:2050,y:320,w:100,h:20},{x:2250,y:250,w:120,h:20},
+      {x:2500,y:190,w:100,h:20, move:{axis:'x', range:70, speed:1.0}},
+      {x:2750,y:280,w:110,h:20},{x:2920,y:220,w:90,h:20},
+    ],
+    gems: [
+      {x:210,y:270},{x:380,y:210},{x:560,y:150},{x:760,y:240},
+      {x:960,y:180},{x:1160,y:260},{x:1440,y:200},{x:1640,y:140},
+      {x:1840,y:220},{x:2090,y:280},{x:2290,y:210},{x:2540,y:150},
+      {x:2790,y:240},{x:2960,y:180},{x:120,y:340},{x:3050,y:340},
+    ],
+    enemies: [
+      {x:400,y:355,range:100,dir:1,baseX:400,type:'walker'},
+      {x:800,y:355,range:110,dir:-1,baseX:800,type:'charger'},
+      {x:1300,y:355,range:90,dir:1,baseX:1300,type:'jumper'},
+      {x:1700,y:355,range:120,dir:-1,baseX:1700,type:'walker'},
+      {x:2200,y:355,range:100,dir:1,baseX:2200,type:'charger'},
+      {x:2650,y:355,range:90,dir:-1,baseX:2650,type:'jumper'},
+      {x:600,y:140,range:100,dir:1,baseX:600,type:'flyer'},
+      {x:1500,y:130,range:110,dir:-1,baseX:1500,type:'flyer'},
+      {x:2400,y:140,range:90,dir:1,baseX:2400,type:'flyer'},
+    ],
+    spikes: [
+      {x:600,y:365,w:80,h:15},{x:1000,y:365,w:60,h:15},
+      {x:1950,y:365,w:70,h:15},{x:2550,y:365,w:80,h:15},
+    ],
+    boxes: [
+      {x:150,y:346,w:34,h:34,contents:'coin'},
+      {x:540,y:156,w:34,h:34,contents:'powerup:star'},
+      {x:940,y:186,w:34,h:34,contents:'coin'},
+      {x:1420,y:206,w:34,h:34,contents:'powerup:shield'},
+      {x:1820,y:226,w:34,h:34,contents:'coin'},
+      {x:2270,y:216,w:34,h:34,contents:'powerup:wing'},
+      {x:2770,y:246,w:34,h:34,contents:'coin'},
+      {x:2940,y:186,w:34,h:34,contents:'powerup:star'},
+    ],
+    powerups: [
+      {x:280,y:280,type:'shield'},{x:1200,y:270,type:'wing'},{x:2100,y:290,type:'star'},
+    ],
+    silverGem: {x:1620,y:120},
+    checkpoints: [{x:1100,y:380},{x:2100,y:380}],
+  },
+  { // ---------- Fase 7: Templo Perdido ----------
+    name: 'Templo Perdido',
+    theme: 'templo',
+    groundY: 380,
+    worldWidth: 3200,
+    playerStart: { x: 50, y: 300 },
+    portalX: 3120,
+    platforms: [
+      {x:200,y:300,w:110,h:20},{x:380,y:240,w:100,h:20},
+      {x:560,y:180,w:90,h:20, move:{axis:'x', range:60, speed:0.9}},
+      {x:780,y:260,w:120,h:20},{x:1000,y:200,w:100,h:20},
+      {x:1200,y:280,w:110,h:20, move:{axis:'y', range:55, speed:1.0}},
+      {x:1450,y:220,w:100,h:20},{x:1650,y:300,w:130,h:20},
+      {x:1900,y:240,w:100,h:20, move:{axis:'x', range:75, speed:0.85}},
+      {x:2150,y:180,w:110,h:20},{x:2400,y:260,w:100,h:20},
+      {x:2600,y:200,w:120,h:20, move:{axis:'y', range:50, speed:1.05}},
+      {x:2850,y:280,w:100,h:20},{x:3020,y:220,w:90,h:20},
+    ],
+    gems: [
+      {x:230,y:260},{x:410,y:200},{x:600,y:140},{x:820,y:220},
+      {x:1040,y:160},{x:1240,y:240},{x:1490,y:180},{x:1700,y:260},
+      {x:1940,y:200},{x:2190,y:140},{x:2440,y:220},{x:2640,y:160},
+      {x:2890,y:240},{x:3060,y:180},{x:140,y:340},{x:3150,y:340},
+    ],
+    enemies: [
+      {x:350,y:355,range:100,dir:1,baseX:350,type:'walker'},
+      {x:700,y:355,range:110,dir:-1,baseX:700,type:'charger'},
+      {x:1100,y:355,range:90,dir:1,baseX:1100,type:'jumper'},
+      {x:1550,y:355,range:120,dir:-1,baseX:1550,type:'walker'},
+      {x:2000,y:355,range:100,dir:1,baseX:2000,type:'charger'},
+      {x:2450,y:355,range:110,dir:-1,baseX:2450,type:'jumper'},
+      {x:2800,y:355,range:90,dir:1,baseX:2800,type:'walker'},
+      {x:900,y:140,range:100,dir:1,baseX:900,type:'flyer'},
+      {x:1750,y:130,range:110,dir:-1,baseX:1750,type:'flyer'},
+      {x:2550,y:140,range:90,dir:1,baseX:2550,type:'flyer'},
+    ],
+    spikes: [
+      {x:480,y:365,w:70,h:15},{x:900,y:365,w:60,h:15},
+      {x:1350,y:365,w:80,h:15},{x:2100,y:365,w:70,h:15},{x:2700,y:365,w:60,h:15},
+    ],
+    boxes: [
+      {x:160,y:346,w:34,h:34,contents:'coin'},
+      {x:580,y:146,w:34,h:34,contents:'powerup:wing'},
+      {x:1020,y:166,w:34,h:34,contents:'coin'},
+      {x:1470,y:186,w:34,h:34,contents:'powerup:shield'},
+      {x:1920,y:206,w:34,h:34,contents:'coin'},
+      {x:2420,y:226,w:34,h:34,contents:'powerup:star'},
+      {x:2870,y:246,w:34,h:34,contents:'coin'},
+      {x:3040,y:186,w:34,h:34,contents:'powerup:wing'},
+    ],
+    powerups: [
+      {x:300,y:270,type:'star'},{x:1300,y:250,type:'shield'},{x:2300,y:230,type:'wing'},
+    ],
+    silverGem: {x:2160,y:120},
+    checkpoints: [{x:1000,y:380},{x:2000,y:380}],
+  },
+  { // ---------- Fase 8: Trono do Barão Sombra (final) ----------
+    name: 'Trono do Barão Sombra',
+    theme: 'noite',
+    groundY: 380,
+    worldWidth: 3400,
+    playerStart: { x: 50, y: 300 },
+    portalX: 3320,
+    platforms: [
+      {x:180,y:310,w:100,h:20},{x:340,y:250,w:90,h:20},
+      {x:500,y:190,w:100,h:20, move:{axis:'y', range:55, speed:1.0}},
+      {x:700,y:270,w:110,h:20},{x:900,y:210,w:90,h:20},
+      {x:1100,y:290,w:120,h:20, move:{axis:'x', range:80, speed:0.9}},
+      {x:1400,y:230,w:100,h:20},{x:1600,y:170,w:90,h:20},
+      {x:1800,y:250,w:110,h:20, move:{axis:'y', range:60, speed:0.95}},
+      {x:2050,y:310,w:100,h:20},{x:2250,y:240,w:120,h:20},
+      {x:2500,y:180,w:100,h:20, move:{axis:'x', range:70, speed:1.05}},
+      {x:2750,y:260,w:110,h:20},{x:2950,y:200,w:100,h:20},
+      {x:3150,y:280,w:120,h:20},
+    ],
+    gems: [
+      {x:210,y:270},{x:370,y:210},{x:540,y:150},{x:740,y:230},
+      {x:940,y:170},{x:1140,y:250},{x:1440,y:190},{x:1640,y:130},
+      {x:1840,y:210},{x:2090,y:270},{x:2290,y:200},{x:2540,y:140},
+      {x:2790,y:220},{x:2990,y:160},{x:3190,y:240},{x:120,y:340},{x:3350,y:340},
+    ],
+    enemies: [
+      {x:300,y:355,range:90,dir:1,baseX:300,type:'walker'},
+      {x:600,y:355,range:100,dir:-1,baseX:600,type:'charger'},
+      {x:1000,y:355,range:110,dir:1,baseX:1000,type:'jumper'},
+      {x:1500,y:355,range:100,dir:-1,baseX:1500,type:'charger'},
+      {x:1900,y:355,range:120,dir:1,baseX:1900,type:'walker'},
+      {x:2300,y:355,range:90,dir:-1,baseX:2300,type:'jumper'},
+      {x:2700,y:355,range:110,dir:1,baseX:2700,type:'charger'},
+      {x:3100,y:355,range:80,dir:-1,baseX:3100,type:'walker'},
+      {x:550,y:130,range:100,dir:1,baseX:550,type:'flyer'},
+      {x:1300,y:120,range:110,dir:-1,baseX:1300,type:'flyer'},
+      {x:2100,y:130,range:90,dir:1,baseX:2100,type:'flyer'},
+      {x:2800,y:120,range:100,dir:-1,baseX:2800,type:'flyer'},
+    ],
+    spikes: [
+      {x:450,y:365,w:70,h:15},{x:850,y:365,w:80,h:15},
+      {x:1350,y:365,w:60,h:15},{x:1750,y:365,w:70,h:15},
+      {x:2450,y:365,w:80,h:15},{x:2900,y:365,w:60,h:15},
+    ],
+    boxes: [
+      {x:140,y:346,w:34,h:34,contents:'coin'},
+      {x:520,y:156,w:34,h:34,contents:'powerup:star'},
+      {x:920,y:176,w:34,h:34,contents:'coin'},
+      {x:1420,y:196,w:34,h:34,contents:'powerup:shield'},
+      {x:1820,y:216,w:34,h:34,contents:'coin'},
+      {x:2270,y:206,w:34,h:34,contents:'powerup:wing'},
+      {x:2520,y:146,w:34,h:34,contents:'powerup:star'},
+      {x:2970,y:166,w:34,h:34,contents:'coin'},
+      {x:3170,y:246,w:34,h:34,contents:'powerup:shield'},
+    ],
+    powerups: [
+      {x:250,y:280,type:'wing'},{x:1200,y:260,type:'star'},
+      {x:2000,y:280,type:'shield'},{x:2700,y:230,type:'star'},
+    ],
+    silverGem: {x:1610,y:110},
+    checkpoints: [{x:1050,y:380},{x:2050,y:380},{x:2900,y:380}],
+    // Chefe final — Barão Sombra (arena antes do portal)
+    boss: {
+      x: 3180,
+      y: 300,
+      hp: 30,
+      arenaLeft: 2950,
+      arenaRight: 3300,
+    },
+  },
 ];
 
-// Paleta de cada tema — copiada de THEMES em js/jogo.js
 const THEMES = {
-  ilha:  { skyTop: 0x7ec8e3, skyBot: 0xc9e8d8, hill: 0x8fc99b, ground: 0x8c5a2b, grass: 0x4caf50, sun: true },
-  gelo:  { skyTop: 0x8fb8e8, skyBot: 0xdbeeff, hill: 0xc7dff0, ground: 0x7f8fa6, grass: 0xeaf6ff, sun: true },
-  vento: { skyTop: 0x6fa8c9, skyBot: 0xd7ece0, hill: 0x7fb08f, ground: 0x8c5a2b, grass: 0x59b06a, sun: true },
-  noite: { skyTop: 0x1b1140, skyBot: 0x3a2a63, hill: 0x241a45, ground: 0x3a2c55, grass: 0x5a3f86, sun: false },
+  ilha:   { skyTop: 0x7ec8e3, skyBot: 0xc9e8d8, hill: 0x8fc99b, ground: 0x8c5a2b, grass: 0x4caf50, sun: true },
+  gelo:   { skyTop: 0x8fb8e8, skyBot: 0xdbeeff, hill: 0xc7dff0, ground: 0x7f8fa6, grass: 0xeaf6ff, sun: true },
+  vento:  { skyTop: 0x6fa8c9, skyBot: 0xd7ece0, hill: 0x7fb08f, ground: 0x8c5a2b, grass: 0x59b06a, sun: true },
+  noite:  { skyTop: 0x1b1140, skyBot: 0x3a2a63, hill: 0x241a45, ground: 0x3a2c55, grass: 0x5a3f86, sun: false },
+  vulcao: { skyTop: 0x4a1c1c, skyBot: 0x8b3a2a, hill: 0x5c2e1f, ground: 0x3d2215, grass: 0xc45c26, sun: false },
+  templo: { skyTop: 0xc4a35a, skyBot: 0xe8d5a3, hill: 0xb8956c, ground: 0x8b6914, grass: 0xd4a84b, sun: true },
 };
 
-// Duração dos power-ups, em ms — mesmos valores do original (que eram em
-// frames a 60fps: STAR_FRAMES=360 → 6s, WING_FRAMES=480 → 8s)
 const STAR_MS = 6000;
 const WING_MS = 8000;

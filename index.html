@@ -2,24 +2,132 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Zeco e a Ilha das Gemas — Protótipo Phaser</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Zeco e a Ilha das Gemas</title>
+<meta name="theme-color" content="#3a1e5c">
+<meta name="description" content="Plataforma 2D — ajude Zeco a recuperar as gemas da ilha.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Zeco">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
-  html,body{margin:0;padding:0;background:#0a0808;height:100%;overflow:hidden;
-    font-family:'Space Grotesk',sans-serif;}
-  #wrap{position:relative;width:100%;height:100vh;display:flex;align-items:center;justify-content:center;}
-  #banner{position:fixed;top:0;left:0;right:0;z-index:10;background:#3a1e5c;color:#ffd166;
-    font-size:12px;text-align:center;padding:6px;letter-spacing:.5px;
-    border-bottom:2px solid #ffd166;}
-  #game{line-height:0;}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    touch-action: none;
+    overscroll-behavior: none;
+    height: 100%;
+    overflow: hidden;
+    background: linear-gradient(180deg, #1b1030 0%, #3a1e5c 40%, #6b2d8f 100%);
+    font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+    color: #fff8e7;
+  }
+  #wrap {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #game { line-height: 0; }
+  #touchControls {
+    display: none;
+    position: fixed;
+    bottom: 18px;
+    left: 0; right: 0;
+    z-index: 40;
+    pointer-events: none;
+    padding: 0 18px;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  #touchControls.show { display: flex; }
+  .dpad { display: flex; gap: 10px; pointer-events: auto; }
+  .touchBtn {
+    width: 64px; height: 64px;
+    border-radius: 16px;
+    background: rgba(0,0,0,0.45);
+    border: 2px solid rgba(255,209,102,0.7);
+    color: #ffd166;
+    font-size: 28px;
+    display: flex; align-items: center; justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    pointer-events: auto;
+  }
+  .touchBtn.active { background: rgba(255,209,102,0.35); transform: scale(0.94); }
+  #jumpBtn { width: 72px; height: 72px; font-size: 32px; }
+  #muteBtn {
+    position: fixed;
+    top: 12px; right: 14px;
+    z-index: 50;
+    background: rgba(0,0,0,0.4);
+    border: 2px solid rgba(255,209,102,0.6);
+    color: #ffd166;
+    font-size: 18px;
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #installBtn {
+    display: none;
+    position: fixed;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    background: #ffd166;
+    color: #3a1e5c;
+    border: none;
+    font-weight: bold;
+    font-size: 15px;
+    padding: 10px 22px;
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
 </style>
 </head>
 <body>
-<div id="banner">🚧 Protótipo Phaser — Fase 1 apenas, só para validar o "feel" (não é a versão final)</div>
-<div id="wrap"><div id="game"></div></div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.70.0/phaser.min.js"></script>
-<script src="js/levels-data.js"></script>
-<script src="js/main.js"></script>
+  <div id="wrap"><div id="game"></div></div>
+  <button id="muteBtn" aria-label="Mute">🔊</button>
+  <button id="installBtn">📲 Instalar Zeco</button>
+  <div id="touchControls">
+    <div class="dpad">
+      <div class="touchBtn" id="leftBtn" role="button" aria-label="Esquerda">◀</div>
+      <div class="touchBtn" id="rightBtn" role="button" aria-label="Direita">▶</div>
+    </div>
+    <div class="touchBtn" id="jumpBtn" role="button" aria-label="Pular">⤒</div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.70.0/phaser.min.js"></script>
+  <script src="js/levels-data.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+    let deferredPrompt = null;
+    const installBtn = document.getElementById('installBtn');
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'block';
+    });
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installBtn.style.display = 'none';
+    });
+    window.addEventListener('appinstalled', () => { installBtn.style.display = 'none'; });
+  </script>
 </body>
 </html>
