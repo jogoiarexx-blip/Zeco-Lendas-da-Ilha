@@ -491,6 +491,7 @@ class HowToScene extends Phaser.Scene {
       '💨 Vento empurra  ·  🧊 Gelo escorrega',
       '🌋 Vulcão e 🏛️ Templo nas fases avançadas',
       '👑 Fase 8: derrote o Barão Sombra (pise / estrela)',
+      '🌊 Fase 9 Ruínas Submersas  ·  💎 Fase 10 Núcleo de Cristal',
     ];
     tips.forEach((t, i) => {
       this.add.text(W / 2, 80 + i * 26, t, {
@@ -548,8 +549,8 @@ class LevelSelectScene extends Phaser.Scene {
       }).setOrigin(0.5);
     }
 
-    const cols = 4;
-    const tileW = 160, tileH = 100;
+    const cols = 5;
+    const tileW = 130, tileH = 92;
     const gapX = 14, gapY = 14;
     const startX = (W - cols * (tileW + gapX)) / 2 + tileW / 2 + gapX / 2;
     const startY = 175;
@@ -629,7 +630,8 @@ class FaseScene extends Phaser.Scene {
     const lvl = LEVELS[this.levelIndex];
     const theme = THEMES[lvl.theme || 'ilha'];
     this.theme = theme;
-    this.buildTextures(theme);
+    // Lazy loading: só gera texturas necessárias para esta fase
+    this.ensureTexturesForLevel(lvl);
     this.cameras.main.fadeIn(300);
     this.gameTime = 0;
     this.paused = false;
@@ -750,7 +752,7 @@ class FaseScene extends Phaser.Scene {
     this.player = this.physics.add.image(lvl.playerStart.x + 17, lvl.playerStart.y + 20, 'playerRight');
     this.player.body.setMaxVelocity(MAX_SPEED * 1.6, 900);
     this.player.body.setCollideWorldBounds(true);
-    this.player.body.setSize(26, 44).setOffset(11, 10);
+    this.player.body.setSize(28, 48).setOffset(12, 12);
     this.vx = 0;
     this.squashX = 1; this.squashY = 1;
     this.facing = 1;
@@ -1494,49 +1496,112 @@ class FaseScene extends Phaser.Scene {
     for (let i = 0; i < 14; i++) this.add.image(i * 300 + 150, H - 150, 'palm_' + (lvl.theme || 'ilha')).setScrollFactor(0.6, 0).setOrigin(0.5, 1);
   }
 
-  buildTextures(theme) {
+  // ===========================================================
+  // LAZY TEXTURE LOADING
+  // Gera sob demanda e reutiliza via Texture Manager do Phaser.
+  // Packs: core | theme:<nome> | enemy:<tipo> | boss
+  // ===========================================================
+  ensureTexturesForLevel(lvl) {
+    const themeName = lvl.theme || 'ilha';
+    const theme = THEMES[themeName] || THEMES.ilha;
     const g = this.make.graphics({ x: 0, y: 0, add: false });
-    const themeName = Object.keys(THEMES).find(k => THEMES[k] === theme);
 
-    if (!this.textures.exists('sky_' + themeName)) {
-      g.clear();
-      g.fillGradientStyle(theme.skyTop, theme.skyTop, theme.skyBot, theme.skyBot, 1);
-      g.fillRect(0, 0, W, H);
-      g.generateTexture('sky_' + themeName, W, H);
+    // Core: player, itens, HUD visuals — uma vez por sessão
+    this._ensureCoreTextures(g);
 
-      g.clear();
-      g.fillStyle(theme.hill, 1);
-      g.beginPath();
-      g.moveTo(0, 140); g.lineTo(0, 60);
-      g.arc(110, 60, 110, Math.PI, 0, false);
-      g.lineTo(220, 140); g.closePath(); g.fillPath();
-      g.generateTexture('hill_' + themeName, 220, 140);
+    // Tema da fase (céu, chão, colinas, palmeiras)
+    this._ensureThemeTextures(g, themeName, theme);
 
-      g.clear();
-      g.lineStyle(6, theme.sun ? 0x6b4226 : 0x2b2040, 1);
-      g.beginPath(); g.moveTo(4, 150); g.lineTo(14, 30); g.strokePath();
-      g.fillStyle(theme.sun ? 0x4a9d5c : 0x4a3d78, 1);
-      for (let j = 0; j < 5; j++) {
-        const ang = (j / 5) * Math.PI * 2;
-        g.fillEllipse(14 + Math.cos(ang) * 22, 26 + Math.sin(ang) * 12, 34, 14);
-      }
-      g.generateTexture('palm_' + themeName, 60, 160);
+    // Só os tipos de inimigo presentes nesta fase
+    const types = new Set((lvl.enemies || []).map(e => e.type || 'walker'));
+    // Boss pode invocar walker
+    if (lvl.boss) types.add('walker');
+    for (const t of types) this._ensureEnemyTexture(g, t);
 
-      g.clear();
-      g.fillStyle(theme.ground, 1); g.fillRect(0, 0, 24, 24);
-      g.fillStyle(theme.grass, 1); g.fillRect(0, 0, 24, 7);
-      g.generateTexture('platformTile_' + themeName, 24, 24);
+    // Boss + projétil só se a fase tiver chefe
+    if (lvl.boss) this._ensureBossTextures(g);
 
-      g.clear();
-      g.fillStyle(theme.ground, 1); g.fillRect(0, 0, 24, 70);
-      g.fillStyle(theme.grass, 1); g.fillRect(0, 0, 24, 14);
-      g.generateTexture('groundTile_' + themeName, 24, 70);
+    g.destroy();
+
+    if (window && window.console && console.debug) {
+      console.debug('[Zeco:lazy]', {
+        theme: themeName,
+        enemies: [...types],
+        boss: !!lvl.boss,
+        cachedKeys: Object.keys(this.textures.list || {}).length,
+      });
     }
-
-    this._buildCommonTextures(g);
   }
 
-  _buildCommonTextures(g) {
+  _ensureThemeTextures(g, themeName, theme) {
+    if (this.textures.exists('sky_' + themeName)) return;
+
+    g.clear();
+    g.fillGradientStyle(theme.skyTop, theme.skyTop, theme.skyBot, theme.skyBot, 1);
+    g.fillRect(0, 0, W, H);
+    g.generateTexture('sky_' + themeName, W, H);
+
+    g.clear();
+    g.fillStyle(theme.hill, 1);
+    g.beginPath();
+    g.moveTo(0, 140); g.lineTo(0, 60);
+    g.arc(110, 60, 110, Math.PI, 0, false);
+    g.lineTo(220, 140); g.closePath(); g.fillPath();
+    g.generateTexture('hill_' + themeName, 220, 140);
+
+    g.clear();
+    g.lineStyle(6, theme.sun ? 0x6b4226 : 0x2b2040, 1);
+    g.beginPath(); g.moveTo(4, 150); g.lineTo(14, 30); g.strokePath();
+    g.fillStyle(theme.sun ? 0x4a9d5c : 0x4a3d78, 1);
+    for (let j = 0; j < 5; j++) {
+      const ang = (j / 5) * Math.PI * 2;
+      g.fillEllipse(14 + Math.cos(ang) * 22, 26 + Math.sin(ang) * 12, 34, 14);
+    }
+    g.generateTexture('palm_' + themeName, 60, 160);
+
+    g.clear();
+    g.fillStyle(theme.ground, 1); g.fillRect(0, 0, 24, 24);
+    g.fillStyle(theme.grass, 1); g.fillRect(0, 0, 24, 7);
+    g.generateTexture('platformTile_' + themeName, 24, 24);
+
+    g.clear();
+    g.fillStyle(theme.ground, 1); g.fillRect(0, 0, 24, 70);
+    g.fillStyle(theme.grass, 1); g.fillRect(0, 0, 24, 14);
+    g.generateTexture('groundTile_' + themeName, 24, 70);
+  }
+
+  _ensureEnemyTexture(g, type) {
+    const keyMap = {
+      walker: 'enemy',
+      jumper: 'enemyJumper',
+      flyer: 'enemyFlyer',
+      charger: 'enemyCharger',
+    };
+    const key = keyMap[type] || 'enemy';
+    if (this.textures.exists(key)) return;
+    // Gera só esse tipo — reutiliza blocos do builder antigo
+    this._buildEnemyTexture(g, key);
+  }
+
+  _ensureBossTextures(g) {
+    if (!this.textures.exists('boss')) this._buildEnemyTexture(g, 'boss');
+    if (!this.textures.exists('bossShot')) this._buildEnemyTexture(g, 'bossShot');
+  }
+
+  _ensureCoreTextures(g) {
+    // Já carregou core nesta sessão?
+    if (this.textures.exists('playerRight') && this.textures.exists('gem') && this.textures.exists('box')) {
+      // ainda garante props ambientais comuns
+      this._buildCommonAmbient(g);
+      return;
+    }
+    this._buildCommonAmbient(g);
+    this._buildCommonItems(g);
+    if (!this.textures.exists('playerRight')) this.drawPlayerTexture(g, 'playerRight', 0);
+    if (!this.textures.exists('playerWalk')) this.drawPlayerTexture(g, 'playerWalk', 6);
+  }
+
+  _buildCommonAmbient(g) {
     if (!this.textures.exists('sun')) {
       g.clear();
       g.fillStyle(0xfff4be, 0.35); g.fillCircle(70, 70, 70);
@@ -1562,203 +1627,268 @@ class FaseScene extends Phaser.Scene {
       g.fillEllipse(40, 20, 80, 40); g.fillEllipse(70, 15, 60, 36);
       g.generateTexture('cloud_night', 110, 45);
     }
+  }
+
+  // Mantido por compatibilidade: se algo chamar _buildCommonTextures, monta core completo
+  _buildCommonTextures(g) {
+    this._buildCommonAmbient(g);
+    this._buildCommonItems(g);
+    // inimigos + boss sob demanda — não gera todos aqui
+    if (!this.textures.exists('playerRight')) this.drawPlayerTexture(g, 'playerRight', 0);
+    if (!this.textures.exists('playerWalk')) this.drawPlayerTexture(g, 'playerWalk', 6);
+  }
+
+  _buildCommonItems(g) {
     if (!this.textures.exists('spikeTile')) {
       g.clear();
-      g.fillStyle(0xd64550, 1);
-      g.fillTriangle(0, 15, 6, 0, 12, 15);
-      g.generateTexture('spikeTile', 12, 15);
+      g.fillStyle(0x8a1c1c, 1); g.fillTriangle(0, 16, 7, 0, 14, 16);
+      g.fillStyle(0xd64550, 1); g.fillTriangle(2, 16, 7, 3, 12, 16);
+      g.fillStyle(0xff8a90, 0.7); g.fillTriangle(5, 16, 7, 6, 9, 16);
+      g.generateTexture('spikeTile', 14, 16);
     }
     if (!this.textures.exists('box')) {
       g.clear();
-      g.fillStyle(0xb5772f, 1); g.fillRect(0, 0, 34, 34);
-      g.lineStyle(2, 0x5c3a15, 1); g.strokeRect(1.5, 1.5, 31, 31);
-      g.beginPath(); g.moveTo(4, 4); g.lineTo(30, 30); g.moveTo(30, 4); g.lineTo(4, 30); g.strokePath();
+      g.fillStyle(0x8B5A2B, 1); g.fillRoundedRect(1, 1, 32, 32, 3);
+      g.fillStyle(0xC4956A, 1); g.fillRoundedRect(3, 3, 28, 28, 2);
+      g.lineStyle(2, 0x5C3A15, 1); g.strokeRoundedRect(2, 2, 30, 30, 2);
+      g.lineStyle(1.5, 0x5C3A15, 0.8);
+      g.beginPath(); g.moveTo(6, 6); g.lineTo(28, 28); g.moveTo(28, 6); g.lineTo(6, 28); g.strokePath();
+      g.fillStyle(0x3d2810, 1); g.fillCircle(8, 8, 2); g.fillCircle(26, 8, 2); g.fillCircle(8, 26, 2); g.fillCircle(26, 26, 2);
       g.generateTexture('box', 34, 34);
     }
     if (!this.textures.exists('gem')) {
       g.clear();
-      g.fillStyle(0xc23f77, 1);
-      g.fillTriangle(9, 2, 0, 9, 9, 18); g.fillTriangle(9, 2, 18, 9, 9, 18);
-      g.fillStyle(0xff5fa2, 1);
-      g.fillTriangle(9, 2, 3, 8, 9, 9); g.fillTriangle(9, 2, 15, 8, 9, 9);
-      g.fillStyle(0xffd7e8, 0.9); g.fillTriangle(9, 2, 6, 6, 9, 7);
-      g.generateTexture('gem', 18, 18);
+      g.fillStyle(0x9b1b5a, 1);
+      g.fillTriangle(10, 1, 0, 10, 10, 20);
+      g.fillTriangle(10, 1, 20, 10, 10, 20);
+      g.fillStyle(0xff4d9a, 1);
+      g.fillTriangle(10, 1, 4, 9, 10, 11);
+      g.fillTriangle(10, 1, 16, 9, 10, 11);
+      g.fillStyle(0xffb3d9, 1);
+      g.fillTriangle(10, 1, 7, 6, 10, 8);
+      g.fillStyle(0xffffff, 0.85);
+      g.fillTriangle(10, 2, 8, 5, 10, 6);
+      g.generateTexture('gem', 20, 21);
     }
     if (!this.textures.exists('silverGem')) {
       g.clear();
-      g.fillStyle(0xb9c4cc, 1);
-      g.fillTriangle(13, 2, 0, 13, 13, 26); g.fillTriangle(13, 2, 26, 13, 13, 26);
-      g.fillStyle(0xe8eef2, 1);
-      g.fillTriangle(13, 2, 5, 12, 13, 13); g.fillTriangle(13, 2, 21, 12, 13, 13);
-      g.fillStyle(0xffffff, 0.9); g.fillTriangle(13, 2, 8, 9, 13, 10);
-      g.generateTexture('silverGem', 26, 26);
+      g.fillStyle(0x7a8a96, 1);
+      g.fillTriangle(14, 1, 0, 14, 14, 28);
+      g.fillTriangle(14, 1, 28, 14, 14, 28);
+      g.fillStyle(0xd0dce6, 1);
+      g.fillTriangle(14, 1, 5, 13, 14, 15);
+      g.fillTriangle(14, 1, 23, 13, 14, 15);
+      g.fillStyle(0xffffff, 0.95);
+      g.fillTriangle(14, 2, 9, 10, 14, 11);
+      g.fillStyle(0xa8d8ff, 0.5); g.fillCircle(14, 12, 4);
+      g.generateTexture('silverGem', 28, 29);
     }
     if (!this.textures.exists('glow')) {
       g.clear();
-      g.fillStyle(0xffffff, 0.5); g.fillCircle(16, 16, 16);
-      g.generateTexture('glow', 32, 32);
+      g.fillStyle(0xffffff, 0.25); g.fillCircle(18, 18, 18);
+      g.fillStyle(0xffffff, 0.45); g.fillCircle(18, 18, 11);
+      g.fillStyle(0xffffff, 0.7); g.fillCircle(18, 18, 5);
+      g.generateTexture('glow', 36, 36);
     }
     if (!this.textures.exists('shieldBubble')) {
       g.clear();
-      g.fillStyle(0x8fe388, 0.25); g.fillCircle(24, 24, 24);
-      g.lineStyle(2, 0x8fe388, 0.8); g.strokeCircle(24, 24, 22);
-      g.generateTexture('shieldBubble', 48, 48);
+      g.fillStyle(0x8fe388, 0.2); g.fillCircle(26, 26, 26);
+      g.lineStyle(3, 0x8fe388, 0.75); g.strokeCircle(26, 26, 23);
+      g.lineStyle(1.5, 0xd4ffd0, 0.5); g.strokeCircle(26, 26, 18);
+      g.generateTexture('shieldBubble', 52, 52);
     }
     if (!this.textures.exists('portal')) {
       g.clear();
-      g.fillStyle(0xffb703, 0.25); g.fillEllipse(30, 60, 52, 120);
-      g.fillStyle(0xfff2c2, 0.6); g.fillEllipse(30, 60, 30, 90);
-      g.generateTexture('portal', 60, 120);
+      g.fillStyle(0xffb703, 0.15); g.fillEllipse(32, 64, 60, 128);
+      g.fillStyle(0xffcc44, 0.35); g.fillEllipse(32, 64, 44, 110);
+      g.fillStyle(0xfff2c2, 0.55); g.fillEllipse(32, 64, 28, 90);
+      g.fillStyle(0xffffff, 0.35); g.fillEllipse(32, 64, 14, 60);
+      g.fillStyle(0x5a3f1a, 1); g.fillRect(8, 118, 48, 8);
+      g.fillStyle(0x8c5a2b, 1); g.fillRect(12, 114, 40, 6);
+      g.generateTexture('portal', 64, 128);
     }
-    if (!this.textures.exists('enemy')) {
-      // Walker — goblin roxo básico
-      g.clear();
-      g.fillStyle(0x4a3580, 1); g.fillEllipse(16, 22, 30, 24);
-      g.fillStyle(0x6a4fb0, 1); g.fillEllipse(16, 18, 28, 20);
-      g.fillStyle(0x3a2870, 1); g.fillTriangle(4, 12, 0, 2, 10, 10);
-      g.fillTriangle(28, 12, 32, 2, 22, 10);
-      g.fillStyle(0x2a1a45, 1); g.fillRect(9, 28, 5, 6); g.fillRect(18, 28, 5, 6);
-      g.fillStyle(0xffffff, 1); g.fillCircle(21, 14, 6);
-      g.fillStyle(0x1a1a1a, 1); g.fillCircle(23, 14, 3);
-      g.fillStyle(0xff6b6b, 0.7); g.fillCircle(12, 18, 2);
-      g.generateTexture('enemy', 34, 36);
-    }
-    if (!this.textures.exists('enemyJumper')) {
-      // Jumper — mais alto, pernas molas
-      g.clear();
-      g.fillStyle(0x2d6a4f, 1); g.fillEllipse(16, 18, 28, 22);
-      g.fillStyle(0x40916c, 1); g.fillEllipse(16, 15, 26, 18);
-      g.fillStyle(0x1b4332, 1);
-      g.fillRect(8, 26, 6, 10); g.fillRect(18, 26, 6, 10);
-      g.fillStyle(0x52b788, 1); g.fillCircle(11, 36, 5); g.fillCircle(21, 36, 5);
-      g.fillStyle(0xffffff, 1); g.fillCircle(20, 12, 6);
-      g.fillStyle(0x081c15, 1); g.fillCircle(22, 12, 3);
-      g.fillStyle(0xffd60a, 1); g.fillTriangle(10, 6, 16, 0, 22, 6);
-      g.generateTexture('enemyJumper', 34, 42);
-    }
-    if (!this.textures.exists('enemyFlyer')) {
-      // Flyer — morcego / espírito
-      g.clear();
-      g.fillStyle(0x7b2cbf, 0.9); g.fillEllipse(18, 16, 22, 18);
-      g.fillStyle(0x9d4edd, 1); g.fillEllipse(18, 14, 18, 14);
-      // asas
-      g.fillStyle(0x5a189a, 0.85);
-      g.fillTriangle(8, 14, -4, 4, 6, 20);
-      g.fillTriangle(28, 14, 40, 4, 30, 20);
-      g.fillStyle(0xffffff, 1); g.fillCircle(22, 12, 5);
-      g.fillStyle(0xff006e, 1); g.fillCircle(23, 12, 2.5);
-      g.generateTexture('enemyFlyer', 40, 28);
-    }
-    if (!this.textures.exists('enemyCharger')) {
-      // Charger — armado, mais agressivo
-      g.clear();
-      g.fillStyle(0x6c2339, 1); g.fillEllipse(18, 20, 32, 24);
-      g.fillStyle(0x9b2335, 1); g.fillEllipse(18, 17, 28, 20);
-      g.fillStyle(0x3d0c11, 1); g.fillRect(10, 28, 6, 7); g.fillRect(20, 28, 6, 7);
-      // chifres
-      g.fillStyle(0x2b0a0e, 1);
-      g.fillTriangle(8, 10, 4, 0, 14, 10);
-      g.fillTriangle(28, 10, 32, 0, 22, 10);
-      g.fillStyle(0xffffff, 1); g.fillCircle(24, 14, 6);
-      g.fillStyle(0xff0000, 1); g.fillCircle(26, 14, 3);
-      // escudo / placa
-      g.fillStyle(0xc9a227, 1); g.fillRect(4, 16, 6, 12);
-      g.generateTexture('enemyCharger', 36, 38);
-    }
-    if (!this.textures.exists('boss')) {
-      // Barão Sombra — figura alta com capa e coroa
-      g.clear();
-      // capa
-      g.fillStyle(0x1a0a2e, 1);
-      g.fillTriangle(32, 20, 4, 70, 60, 70);
-      g.fillStyle(0x2d1b4e, 1);
-      g.fillTriangle(32, 24, 12, 68, 52, 68);
-      // corpo
-      g.fillStyle(0x3a1e5c, 1); g.fillEllipse(32, 40, 28, 36);
-      g.fillStyle(0x5a3f8f, 1); g.fillEllipse(32, 36, 22, 28);
-      // cabeça
-      g.fillStyle(0x1a1a2e, 1); g.fillCircle(32, 18, 14);
-      g.fillStyle(0x2a2a40, 1); g.fillCircle(32, 17, 12);
-      // olhos vermelhos
-      g.fillStyle(0xff0040, 1); g.fillCircle(27, 16, 3.5); g.fillCircle(37, 16, 3.5);
-      g.fillStyle(0xffaaaa, 1); g.fillCircle(27, 15, 1.5); g.fillCircle(37, 15, 1.5);
-      // coroa
-      g.fillStyle(0xffd166, 1);
-      g.fillRect(22, 4, 20, 6);
-      g.fillTriangle(22, 4, 26, -4, 30, 4);
-      g.fillTriangle(30, 4, 32, -6, 34, 4);
-      g.fillTriangle(34, 4, 38, -4, 42, 4);
-      // boca
-      g.fillStyle(0x8b0000, 1); g.fillRect(28, 24, 8, 2);
-      g.generateTexture('boss', 64, 72);
-    }
-    if (!this.textures.exists('bossShot')) {
-      g.clear();
-      g.fillStyle(0x9b59b6, 0.9); g.fillCircle(10, 10, 10);
-      g.fillStyle(0xe0aaff, 1); g.fillCircle(10, 10, 6);
-      g.fillStyle(0xffffff, 0.9); g.fillCircle(8, 8, 2.5);
-      g.generateTexture('bossShot', 20, 20);
-    }
-    if (!this.textures.exists('playerRight')) this.drawPlayerTexture(g, 'playerRight', 0);
-    if (!this.textures.exists('playerWalk')) this.drawPlayerTexture(g, 'playerWalk', 6);
-
-    g.destroy();
   }
 
-  // Personagem com mais detalhe (mais polígonos / formas)
+  // Gera UMA textura de inimigo/boss sob demanda
+  _buildEnemyTexture(g, key) {
+    if (this.textures.exists(key)) return;
+
+    if (key === 'enemy') {
+      g.clear();
+      g.fillStyle(0x000000, 0.2); g.fillEllipse(18, 38, 28, 6);
+      g.fillStyle(0x3d2a6e, 1); g.fillEllipse(18, 24, 32, 26);
+      g.fillStyle(0x6a4fb0, 1); g.fillEllipse(18, 20, 28, 22);
+      g.fillStyle(0x8b6cc9, 1); g.fillEllipse(18, 16, 20, 14);
+      g.fillStyle(0x5a3f8f, 1);
+      g.fillTriangle(4, 14, -2, 0, 12, 12);
+      g.fillTriangle(32, 14, 38, 0, 24, 12);
+      g.fillStyle(0xffffff, 1); g.fillCircle(24, 15, 6);
+      g.fillStyle(0x1a1a1a, 1); g.fillCircle(26, 15, 3);
+      g.fillStyle(0xffffff, 0.9); g.fillCircle(27, 14, 1.2);
+      g.fillStyle(0x2a1a45, 1); g.fillRect(14, 24, 10, 3);
+      g.fillStyle(0xffeebb, 1); g.fillRect(15, 24, 3, 3); g.fillRect(20, 24, 3, 3);
+      g.fillStyle(0x2a1a45, 1); g.fillRect(10, 32, 6, 8); g.fillRect(20, 32, 6, 8);
+      g.generateTexture('enemy', 38, 42);
+      return;
+    }
+    if (key === 'enemyJumper') {
+      g.clear();
+      g.fillStyle(0x000000, 0.2); g.fillEllipse(18, 44, 26, 6);
+      g.fillStyle(0x1b4332, 1); g.fillEllipse(18, 20, 30, 24);
+      g.fillStyle(0x2d6a4f, 1); g.fillEllipse(18, 17, 26, 20);
+      g.fillStyle(0x52b788, 1); g.fillEllipse(18, 13, 18, 12);
+      g.lineStyle(2, 0x95d5b2, 1); g.lineBetween(18, 4, 18, -2);
+      g.fillStyle(0xffd60a, 1); g.fillCircle(18, -3, 3);
+      g.fillStyle(0xffffff, 1); g.fillCircle(23, 13, 5.5);
+      g.fillStyle(0x081c15, 1); g.fillCircle(25, 13, 2.8);
+      g.fillStyle(0x40916c, 1);
+      g.fillRect(9, 28, 7, 12); g.fillRect(20, 28, 7, 12);
+      g.fillStyle(0x95d5b2, 1);
+      g.fillCircle(12, 42, 6); g.fillCircle(24, 42, 6);
+      g.generateTexture('enemyJumper', 36, 50);
+      return;
+    }
+    if (key === 'enemyFlyer') {
+      g.clear();
+      g.fillStyle(0x5a189a, 0.75);
+      g.fillTriangle(16, 16, -6, 2, 10, 24);
+      g.fillTriangle(24, 16, 46, 2, 30, 24);
+      g.fillStyle(0x9d4edd, 0.5);
+      g.fillTriangle(16, 16, 0, 6, 12, 20);
+      g.fillTriangle(24, 16, 40, 6, 28, 20);
+      g.fillStyle(0x3c096c, 1); g.fillEllipse(20, 16, 22, 18);
+      g.fillStyle(0x7b2cbf, 1); g.fillEllipse(20, 14, 16, 14);
+      g.fillStyle(0xffffff, 1); g.fillCircle(25, 12, 5);
+      g.fillStyle(0xff006e, 1); g.fillCircle(26, 12, 2.5);
+      g.fillStyle(0xffffff, 0.8); g.fillCircle(27, 11, 1);
+      g.generateTexture('enemyFlyer', 44, 30);
+      return;
+    }
+    if (key === 'enemyCharger') {
+      g.clear();
+      g.fillStyle(0x000000, 0.2); g.fillEllipse(20, 40, 30, 6);
+      g.fillStyle(0x4a1520, 1); g.fillEllipse(20, 22, 34, 26);
+      g.fillStyle(0x9b2335, 1); g.fillEllipse(20, 18, 28, 22);
+      g.fillStyle(0xc44536, 1); g.fillEllipse(20, 14, 18, 12);
+      g.fillStyle(0x2b0a0e, 1);
+      g.fillTriangle(8, 10, 2, -4, 16, 12);
+      g.fillTriangle(32, 10, 38, -4, 24, 12);
+      g.fillStyle(0x5c1a1a, 1);
+      g.fillTriangle(9, 10, 5, 0, 14, 11);
+      g.fillTriangle(31, 10, 35, 0, 26, 11);
+      g.fillStyle(0xffffff, 1); g.fillCircle(27, 14, 6);
+      g.fillStyle(0xff0000, 1); g.fillCircle(29, 14, 3.2);
+      g.fillStyle(0xffffff, 0.9); g.fillCircle(30, 13, 1.2);
+      g.fillStyle(0xc9a227, 1); g.fillRoundedRect(3, 16, 8, 14, 2);
+      g.fillStyle(0xffd166, 1); g.fillRoundedRect(4, 17, 6, 5, 1);
+      g.fillStyle(0x3d0c11, 1); g.fillRect(12, 32, 7, 9); g.fillRect(22, 32, 7, 9);
+      g.generateTexture('enemyCharger', 40, 44);
+      return;
+    }
+    if (key === 'boss') {
+      g.clear();
+      g.fillStyle(0x000000, 0.25); g.fillEllipse(34, 76, 40, 8);
+      g.fillStyle(0x0d0518, 1);
+      g.fillTriangle(34, 18, 0, 78, 68, 78);
+      g.fillStyle(0x1a0a2e, 1);
+      g.fillTriangle(34, 22, 8, 76, 60, 76);
+      g.fillStyle(0x4a1c6b, 0.7);
+      g.fillTriangle(34, 30, 16, 72, 52, 72);
+      g.fillStyle(0x2a1450, 1); g.fillEllipse(34, 42, 30, 38);
+      g.fillStyle(0x5a3f8f, 1); g.fillEllipse(34, 38, 24, 30);
+      g.fillStyle(0xffd166, 1);
+      g.fillEllipse(16, 30, 14, 10);
+      g.fillEllipse(52, 30, 14, 10);
+      g.fillStyle(0x12121f, 1); g.fillCircle(34, 18, 15);
+      g.fillStyle(0x1f1f32, 1); g.fillCircle(34, 17, 13);
+      g.fillStyle(0xff0040, 1); g.fillCircle(28, 16, 4); g.fillCircle(40, 16, 4);
+      g.fillStyle(0xff8899, 1); g.fillCircle(28, 15, 1.8); g.fillCircle(40, 15, 1.8);
+      g.fillStyle(0xc9a227, 1); g.fillRect(22, 3, 24, 7);
+      g.fillStyle(0xffd166, 1);
+      g.fillTriangle(22, 3, 27, -5, 32, 3);
+      g.fillTriangle(30, 3, 34, -7, 38, 3);
+      g.fillTriangle(36, 3, 41, -5, 46, 3);
+      g.fillStyle(0x5b2a8a, 1); g.fillCircle(34, 1, 2.5);
+      g.fillStyle(0x5a0000, 1); g.fillRect(29, 25, 10, 2.5);
+      g.generateTexture('boss', 70, 82);
+      return;
+    }
+    if (key === 'bossShot') {
+      g.clear();
+      g.fillStyle(0x5b2a8a, 0.5); g.fillCircle(12, 12, 12);
+      g.fillStyle(0x9b59b6, 0.9); g.fillCircle(12, 12, 8);
+      g.fillStyle(0xe0aaff, 1); g.fillCircle(12, 12, 4.5);
+      g.fillStyle(0xffffff, 0.95); g.fillCircle(10, 10, 2);
+      g.generateTexture('bossShot', 24, 24);
+    }
+  }
+
+  // Personagem com mais detalhe e volume
+    // Personagem com mais detalhe e volume
   drawPlayerTexture(g, key, legOffset) {
     g.clear();
-    const cx = 22, cy = 32;
+    const cx = 24, cy = 34;
     // sombra
-    g.fillStyle(0x000000, 0.22); g.fillEllipse(cx, cy + 28, 26, 7);
+    g.fillStyle(0x000000, 0.22); g.fillEllipse(cx, cy + 30, 28, 7);
     // pernas
-    g.fillStyle(0x4a3220, 1);
-    g.fillRect(cx - 13, cy + 6 - legOffset * 0.25, 10, 18);
-    g.fillRect(cx + 3, cy + 6 + legOffset * 0.25, 10, 18);
+    g.fillStyle(0x3d2914, 1);
+    g.fillRoundedRect(cx - 14, cy + 6 - legOffset * 0.25, 11, 20, 2);
+    g.fillRoundedRect(cx + 3, cy + 6 + legOffset * 0.25, 11, 20, 2);
     // botas
-    g.fillStyle(0x2e1c10, 1);
-    g.fillRect(cx - 14, cy + 20 - legOffset * 0.25, 12, 7);
-    g.fillRect(cx + 2, cy + 20 + legOffset * 0.25, 12, 7);
-    // corpo (tronco em camadas)
-    g.fillStyle(0x2b6b37, 1); g.fillEllipse(cx, cy - 2, 28, 26);
-    g.fillStyle(0x3f9a4f, 1); g.fillEllipse(cx, cy - 5, 24, 22);
-    // colete / faixa
-    g.fillStyle(0xc0392b, 1); g.fillRect(cx - 16, cy + 4, 32, 6);
-    g.fillStyle(0x8f2419, 1); g.fillRect(cx - 3, cy + 4, 6, 6);
+    g.fillStyle(0x1f1208, 1);
+    g.fillRoundedRect(cx - 15, cy + 22 - legOffset * 0.25, 13, 8, 2);
+    g.fillRoundedRect(cx + 2, cy + 22 + legOffset * 0.25, 13, 8, 2);
+    g.fillStyle(0x5c3a15, 1);
+    g.fillRect(cx - 14, cy + 22 - legOffset * 0.25, 11, 3);
+    g.fillRect(cx + 3, cy + 22 + legOffset * 0.25, 11, 3);
+    // tronco
+    g.fillStyle(0x1e5c2a, 1); g.fillEllipse(cx, cy - 1, 30, 28);
+    g.fillStyle(0x3f9a4f, 1); g.fillEllipse(cx, cy - 4, 26, 24);
+    g.fillStyle(0x6bcb7a, 0.5); g.fillEllipse(cx - 4, cy - 8, 12, 10);
+    // faixa vermelha
+    g.fillStyle(0xc0392b, 1); g.fillRect(cx - 17, cy + 5, 34, 7);
+    g.fillStyle(0xffd166, 1); g.fillRect(cx - 3, cy + 5, 6, 7);
+    g.fillStyle(0x8f2419, 1); g.fillRect(cx - 17, cy + 11, 34, 2);
     // braços
     g.fillStyle(0x3f9a4f, 1);
-    g.fillEllipse(cx - 16, cy + 2, 10, 8);
-    g.fillEllipse(cx + 16, cy + 2, 10, 8);
+    g.fillEllipse(cx - 18, cy + 2, 11, 9);
+    g.fillEllipse(cx + 18, cy + 2, 11, 9);
+    g.fillStyle(0xf4c28a, 1);
+    g.fillCircle(cx - 20, cy + 6, 4);
+    g.fillCircle(cx + 20, cy + 6, 4);
     // cabeça
-    g.fillStyle(0xf4c28a, 1); g.fillCircle(cx, cy - 24, 14);
-    g.fillStyle(0xe6a878, 0.45); g.fillCircle(cx + 5, cy - 21, 8);
-    // cabelo / topete em picos
-    g.fillStyle(0x2a1810, 1);
+    g.fillStyle(0xe8b878, 1); g.fillCircle(cx, cy - 26, 15);
+    g.fillStyle(0xf4c28a, 1); g.fillCircle(cx, cy - 27, 13.5);
+    g.fillStyle(0xffd4a8, 0.5); g.fillCircle(cx + 5, cy - 24, 7);
+    // cabelo em picos
+    g.fillStyle(0x1a1008, 1);
     g.beginPath();
-    g.moveTo(cx - 12, cy - 32);
-    g.lineTo(cx - 10, cy - 48);
-    g.lineTo(cx - 5, cy - 36);
-    g.lineTo(cx - 1, cy - 50);
-    g.lineTo(cx + 3, cy - 35);
-    g.lineTo(cx + 7, cy - 47);
-    g.lineTo(cx + 12, cy - 31);
+    g.moveTo(cx - 13, cy - 34);
+    g.lineTo(cx - 11, cy - 52);
+    g.lineTo(cx - 5, cy - 38);
+    g.lineTo(cx - 1, cy - 54);
+    g.lineTo(cx + 3, cy - 37);
+    g.lineTo(cx + 8, cy - 51);
+    g.lineTo(cx + 13, cy - 33);
     g.closePath(); g.fillPath();
     // bandana
-    g.fillStyle(0xd62828, 1); g.fillEllipse(cx, cy - 33, 14, 5);
+    g.fillStyle(0xd62828, 1); g.fillEllipse(cx, cy - 35, 15, 6);
     g.beginPath();
-    g.moveTo(cx - 12, cy - 32); g.lineTo(cx - 20, cy - 26); g.lineTo(cx - 11, cy - 26);
+    g.moveTo(cx - 13, cy - 34); g.lineTo(cx - 22, cy - 28); g.lineTo(cx - 12, cy - 28);
     g.closePath(); g.fillPath();
+    g.fillStyle(0xff6b6b, 1); g.fillEllipse(cx, cy - 35, 10, 3);
     // olho
-    g.fillStyle(0xffffff, 1); g.fillCircle(cx + 6, cy - 25, 5.5);
-    g.fillStyle(0x1a1a1a, 1); g.fillCircle(cx + 8, cy - 24, 3);
-    g.fillStyle(0xffffff, 0.8); g.fillCircle(cx + 9, cy - 25, 1.2);
-    // sobrancelha + boca
+    g.fillStyle(0xffffff, 1); g.fillCircle(cx + 6, cy - 27, 6);
+    g.fillStyle(0x1a1a1a, 1); g.fillCircle(cx + 8, cy - 26, 3.2);
+    g.fillStyle(0xffffff, 0.95); g.fillCircle(cx + 9, cy - 27, 1.3);
+    // sobrancelha e boca
     g.fillStyle(0x2a1810, 1);
-    g.fillRect(cx + 1, cy - 32, 10, 2);
-    g.fillRect(cx + 3, cy - 16, 8, 1.8);
-    // brinco / detalhe
-    g.fillStyle(0xffd166, 1); g.fillCircle(cx - 12, cy - 22, 2);
-    g.generateTexture(key, 48, 66);
+    g.fillRect(cx + 1, cy - 34, 11, 2.2);
+    g.fillRect(cx + 3, cy - 17, 9, 1.8);
+    // brinco
+    g.fillStyle(0xffd166, 1); g.fillCircle(cx - 13, cy - 24, 2.3);
+    g.fillStyle(0xfff3b0, 1); g.fillCircle(cx - 13, cy - 24, 1);
+    g.generateTexture(key, 52, 70);
   }
 }
 
