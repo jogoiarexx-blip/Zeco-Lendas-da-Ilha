@@ -1,18 +1,16 @@
 // =============================================================
-// Áudio 100% sintético via Web Audio API (mesmo do original)
+// Zeco e a Ilha das Gemas — Áudio
+// 100% sintetizado via Web Audio API — sem arquivos externos
+// Depende de: muteBtn (definido em jogo.js)
 // =============================================================
 let audioCtx = null;
 let masterGain = null;
 let muted = localStorage.getItem('zeco_muted') === '1';
 let musicInterval = null;
-let musicStep = 0;
-
-const muteBtn = document.getElementById('muteBtn');
-if (muteBtn) muteBtn.textContent = muted ? '🔇' : '🔊';
 
 function initAudio() {
   if (audioCtx) {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
     return;
   }
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -22,8 +20,8 @@ function initAudio() {
   startMusic();
 }
 
-function tone(freq, start, dur, type = 'sine', vol = 0.2, glideTo = null) {
-  if (!audioCtx || muted) return;
+function tone(freq, start, dur, type='sine', vol=0.2, glideTo=null) {
+  if (!audioCtx) return;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   osc.type = type;
@@ -38,7 +36,7 @@ function tone(freq, start, dur, type = 'sine', vol = 0.2, glideTo = null) {
   osc.stop(start + dur + 0.05);
 }
 
-function playJump(double = false) {
+function playJump(double=false) {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
   tone(double ? 520 : 340, t, 0.16, 'square', 0.15, double ? 900 : 620);
@@ -49,6 +47,14 @@ function playCoin() {
   tone(880, t, 0.09, 'square', 0.13);
   tone(1320, t + 0.07, 0.14, 'square', 0.13);
 }
+
+function playAttack() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  tone(520, t, 0.07, 'sawtooth', 0.12, 180);
+  tone(180, t + 0.025, 0.06, 'triangle', 0.08, 90);
+}
+
 function playStomp() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
@@ -63,7 +69,7 @@ function playBreak() {
 function playPowerUp() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
-  [523, 659, 784, 1046].forEach((f, i) => tone(f, t + i * 0.08, 0.16, 'square', 0.15));
+  [523,659,784,1046].forEach((f,i) => tone(f, t + i*0.08, 0.16, 'square', 0.15));
 }
 function playHurt() {
   if (!audioCtx) return;
@@ -73,17 +79,17 @@ function playHurt() {
 function playWin() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
-  [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, t + i * 0.14, 0.2, 'square', 0.16));
+  [523,659,784,1046,1318].forEach((f,i) => tone(f, t + i*0.14, 0.2, 'square', 0.16));
 }
 function playGameOver() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
-  [392, 349, 294, 220].forEach((f, i) => tone(f, t + i * 0.22, 0.25, 'sawtooth', 0.15));
+  [392,349,294,220].forEach((f,i) => tone(f, t + i*0.22, 0.25, 'sawtooth', 0.15));
 }
 function playExtraLife() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
-  [523, 659, 784, 1046, 1318, 1568].forEach((f, i) => tone(f, t + i * 0.09, 0.18, 'square', 0.16));
+  [523,659,784,1046,1318,1568].forEach((f,i) => tone(f, t + i*0.09, 0.18, 'square', 0.16));
 }
 function playCheckpoint() {
   if (!audioCtx) return;
@@ -99,11 +105,14 @@ function playObjective() {
   tone(1320, t + 0.2, 0.28, 'square', 0.2);
 }
 
+// música de fundo: loop tropical simples em escala pentatônica
 const musicScale = [261.6, 293.7, 329.6, 392.0, 440.0];
+let musicStep = 0;
 function startMusic() {
   if (musicInterval) return;
   musicInterval = setInterval(() => {
     if (!audioCtx || muted) return;
+    if (typeof state !== 'undefined' && state.paused) return;
     const t = audioCtx.currentTime;
     const note = musicScale[musicStep % musicScale.length];
     tone(note / 2, t, 0.35, 'triangle', 0.05);
@@ -112,12 +121,13 @@ function startMusic() {
   }, 420);
 }
 
-if (muteBtn) {
-  muteBtn.addEventListener('click', () => {
-    muted = !muted;
-    muteBtn.textContent = muted ? '🔇' : '🔊';
-    if (masterGain) masterGain.gain.value = muted ? 0 : 0.7;
-    localStorage.setItem('zeco_muted', muted ? '1' : '0');
-    if (!muted) initAudio();
-  });
-}
+muteBtn.addEventListener('click', () => {
+  muted = !muted;
+  muteBtn.textContent = muted ? '🔇' : '🔊';
+  if (masterGain) masterGain.gain.value = muted ? 0 : 0.7;
+  localStorage.setItem('zeco_muted', muted ? '1' : '0');
+});
+
+// Reflete o estado salvo de mudo no ícone assim que a página carrega,
+// mesmo antes do áudio ser inicializado (que só acontece no primeiro clique/toque).
+muteBtn.textContent = muted ? '🔇' : '🔊';
