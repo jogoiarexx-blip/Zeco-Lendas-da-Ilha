@@ -20,23 +20,44 @@ const islandMapBtn = document.getElementById('islandMapBtn');
 const islandMapBackBtn = document.getElementById('islandMapBackBtn');
 const screenIslandMap = document.getElementById('screenIslandMap');
 const islandMap = document.getElementById('islandMap');
+const creditsBtn = document.getElementById('creditsBtn');
+const creditsBackBtn = document.getElementById('creditsBackBtn');
+const screenCredits = document.getElementById('screenCredits');
+const menuProgressPercent = document.getElementById('menuProgressPercent');
+const menuProgressFill = document.getElementById('menuProgressFill');
+const menuCompletedStat = document.getElementById('menuCompletedStat');
+const menuObjectiveStat = document.getElementById('menuObjectiveStat');
+const menuBestStat = document.getElementById('menuBestStat');
+const menuNextRegion = document.getElementById('menuNextRegion');
+const continueSubtext = document.getElementById('continueSubtext');
 
 let storyCursor = 0;
 let storyMode = 'browse'; // browse | start
 let pendingStart = null; // {level, continueRun}
 
 function hideAllScreens() {
-  [screenMenu, screenHowTo, screenEnd, screenLevelSelect, screenStory, screenSettings, screenPause, screenIslandMap]
+  [screenMenu, screenHowTo, screenEnd, screenLevelSelect, screenStory, screenSettings, screenPause, screenIslandMap, screenCredits]
     .forEach(el => el && el.classList.add('hidden'));
 }
 
 function refreshContinueButton() {
-  const hasProgress = state.levelProgress.some(p => p.completed || p.objective) || state.lastPlayedLevel > 0;
+  const completed = state.levelProgress.filter(p => p && p.completed).length;
+  const objectives = state.levelProgress.filter(p => p && p.objective).length;
+  const hasProgress = completed > 0 || objectives > 0 || state.lastPlayedLevel > 0;
   continueBtn.classList.toggle('hidden', !hasProgress);
+  const idx = Math.max(0, Math.min(state.lastPlayedLevel, levels.length - 1));
   if (hasProgress) {
-    const idx = Math.max(0, Math.min(state.lastPlayedLevel, levels.length - 1));
-    continueBtn.textContent = '⏩ Continuar · Fase ' + (idx + 1);
+    if (continueSubtext) continueSubtext.textContent = 'Fase ' + (idx + 1) + ' · ' + ((typeof ZECO_LEVEL_NAMES !== 'undefined' && ZECO_LEVEL_NAMES[idx]) || 'Aventura');
   }
+
+  const total = Math.max(1, levels.length);
+  const pct = Math.round((completed / total) * 100);
+  if (menuProgressPercent) menuProgressPercent.textContent = pct + '%';
+  if (menuProgressFill) menuProgressFill.style.width = pct + '%';
+  if (menuCompletedStat) menuCompletedStat.textContent = completed + '/' + total;
+  if (menuObjectiveStat) menuObjectiveStat.textContent = objectives + '/' + total;
+  if (menuBestStat) menuBestStat.textContent = state.bestScore || 0;
+  if (menuNextRegion) menuNextRegion.textContent = (typeof ZECO_LEVEL_NAMES !== 'undefined' && ZECO_LEVEL_NAMES[idx]) || ('Fase ' + (idx + 1));
 }
 
 function showMainMenu() {
@@ -154,11 +175,11 @@ soundToggle.addEventListener('change', () => {
 });
 shakeToggle.addEventListener('change', () => {
   state.cameraShake = shakeToggle.checked;
-  localStorage.setItem('zeco_shake', state.cameraShake ? '1' : '0');
+  safeStorageSet('zeco_shake', state.cameraShake ? '1' : '0');
 });
 tipsToggle.addEventListener('change', () => {
   state.showTips = tipsToggle.checked;
-  localStorage.setItem('zeco_tips', state.showTips ? '1' : '0');
+  safeStorageSet('zeco_tips', state.showTips ? '1' : '0');
 });
 
 howToBtn.addEventListener('click', () => {
@@ -168,7 +189,7 @@ howToBtn.addEventListener('click', () => {
 howToBackBtn.addEventListener('click', showMainMenu);
 
 pauseBtn.addEventListener('click', () => {
-  if (state.running) setPaused(!state.paused);
+  if (state.running && !dialogueOpen) setPaused(!state.paused);
 });
 resumeBtn.addEventListener('click', () => setPaused(false));
 restartLevelBtn.addEventListener('click', () => {
@@ -193,6 +214,13 @@ startBtn.addEventListener('click', () => {
 });
 
 menuBtn.addEventListener('click', showMainMenu);
+
+if (creditsBtn) creditsBtn.addEventListener('click', () => {
+  hideAllScreens();
+  overlay.classList.remove('hidden');
+  screenCredits.classList.remove('hidden');
+});
+if (creditsBackBtn) creditsBackBtn.addEventListener('click', showMainMenu);
 
 // Estado inicial do menu.
 refreshContinueButton();

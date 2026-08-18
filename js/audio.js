@@ -5,7 +5,7 @@
 // =============================================================
 let audioCtx = null;
 let masterGain = null;
-let muted = localStorage.getItem('zeco_muted') === '1';
+let muted = (typeof safeStorageGet === 'function' ? safeStorageGet('zeco_muted', '0') : '0') === '1';
 let musicInterval = null;
 
 function initAudio() {
@@ -125,7 +125,7 @@ muteBtn.addEventListener('click', () => {
   muted = !muted;
   muteBtn.textContent = muted ? '🔇' : '🔊';
   if (masterGain) masterGain.gain.value = muted ? 0 : 0.7;
-  localStorage.setItem('zeco_muted', muted ? '1' : '0');
+  if (typeof safeStorageSet === 'function') safeStorageSet('zeco_muted', muted ? '1' : '0');
 });
 
 // Reflete o estado salvo de mudo no ícone assim que a página carrega,

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Zeco e a Ilha das Gemas</title>
+<title>Zeco: Lendas da Ilha — v4.2</title>
 <meta name="theme-color" content="#3a1e5c">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
@@ -47,24 +47,77 @@
   </div>
 
   <div id="overlay">
-    <div id="screenMenu" class="screen">
-      <h2 class="menuTitle">🌴 ZECO 🌴</h2>
-      <h3 class="menuSubtitle">Lendas da Ilha</h3>
-      <p id="bestScoreDisplay" class="bestScoreDisplay hidden"></p>
-      <p>
-        Ajude o Zeco a atravessar a ilha, pular nos capangas do Barão Sombra
-        e coletar todas as gemas antes de chegar ao portal! Quebre as caixas
-        de madeira para achar moedas e poderes escondidos.
-      </p>
-      <div class="menuButtons">
-        <button id="playBtn">▶ Nova Aventura</button>
-        <button id="continueBtn" class="continueBtn hidden">⏩ Continuar</button>
-        <button id="storyBtn" class="secondaryBtn">📖 História</button>
-        <button id="levelSelectBtn" class="secondaryBtn">🗺️ Selecionar Fase</button>
-        <button id="islandMapBtn" class="secondaryBtn">🏝️ Mapa da Ilha</button>
-        <button id="howToBtn" class="secondaryBtn">❓ Como Jogar</button>
-        <button id="settingsBtn" class="secondaryBtn">⚙️ Opções</button>
+    <div id="screenMenu" class="screen mainMenuScreen">
+      <div class="menuScene" aria-hidden="true">
+        <div class="menuMoon"></div>
+        <div class="menuCloud cloudA"></div>
+        <div class="menuCloud cloudB"></div>
+        <div class="menuIsland islandBack"></div>
+        <div class="menuIsland islandFront"></div>
+        <div class="menuFirefly firefly1"></div>
+        <div class="menuFirefly firefly2"></div>
+        <div class="menuFirefly firefly3"></div>
       </div>
+
+      <div class="mainMenuShell">
+        <section class="menuHeroPanel">
+          <div class="menuBrand">
+            <div class="menuEyebrow">UMA AVENTURA DE PLATAFORMA</div>
+            <h1 class="menuLogo"><span>ZECO</span><small>LENDAS DA ILHA</small></h1>
+            <div class="menuTagline">As Gemas Ancestrais despertaram. A ilha precisa de um herói.</div>
+          </div>
+
+          <div class="heroStage">
+            <div class="heroAura"></div>
+            <img class="menuZeco" src="assets/zeco/idle1.png" alt="Zeco">
+            <div class="heroGround"></div>
+            <div class="heroGem gemOne">◆</div>
+            <div class="heroGem gemTwo">◆</div>
+            <div class="heroGem gemThree">◆</div>
+          </div>
+
+          <div class="menuProgressCard">
+            <div class="menuProgressTop">
+              <span>PROGRESSO DA AVENTURA</span>
+              <b id="menuProgressPercent">0%</b>
+            </div>
+            <div class="menuProgressTrack"><div id="menuProgressFill" class="menuProgressFill"></div></div>
+            <div class="menuStatsGrid">
+              <div class="menuStat"><span>🔷</span><b id="menuCompletedStat">0/10</b><small>Fases</small></div>
+              <div class="menuStat"><span>🥈</span><b id="menuObjectiveStat">0/10</b><small>Segredos</small></div>
+              <div class="menuStat"><span>🏆</span><b id="menuBestStat">0</b><small>Recorde</small></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="menuActionPanel">
+          <div class="menuChapterBadge">
+            <span class="chapterIcon">🗺️</span>
+            <div><small>PRÓXIMO DESTINO</small><b id="menuNextRegion">Costa dos Coqueiros</b></div>
+          </div>
+
+          <div class="mainActionButtons">
+            <button id="continueBtn" class="menuBigBtn continueBtn hidden"><span class="btnIcon">▶</span><span><b>Continuar</b><small id="continueSubtext">Retomar aventura</small></span><i>›</i></button>
+            <button id="playBtn" class="menuBigBtn newGameBtn"><span class="btnIcon">✦</span><span><b>Nova Aventura</b><small>Começar desde o prólogo</small></span><i>›</i></button>
+          </div>
+
+          <div class="menuDivider"><span>EXPLORAR</span></div>
+          <div class="menuTileGrid">
+            <button id="levelSelectBtn" class="menuTileBtn"><span>🧭</span><b>Fases</b><small>Escolher região</small></button>
+            <button id="islandMapBtn" class="menuTileBtn"><span>🏝️</span><b>Mapa</b><small>Ver a ilha</small></button>
+            <button id="storyBtn" class="menuTileBtn"><span>📖</span><b>História</b><small>Crônicas</small></button>
+            <button id="howToBtn" class="menuTileBtn"><span>🎮</span><b>Como Jogar</b><small>Controles</small></button>
+            <button id="settingsBtn" class="menuTileBtn"><span>⚙️</span><b>Opções</b><small>Som e tela</small></button>
+            <button id="creditsBtn" class="menuTileBtn"><span>✨</span><b>Créditos</b><small>Sobre o jogo</small></button>
+          </div>
+
+          <div class="menuFooter">
+            <span id="menuSaveStatus">● PROGRESSO SALVO LOCALMENTE</span>
+            <span>ZECO • v4.2</span>
+          </div>
+        </section>
+      </div>
+      <p id="bestScoreDisplay" class="bestScoreDisplay hidden"></p>
     </div>
 
     <div id="screenHowTo" class="screen hidden">
@@ -140,6 +193,20 @@
         <button id="restartLevelBtn" class="secondaryBtn">↻ Reiniciar Fase</button>
         <button id="pauseMenuBtn" class="secondaryBtn">🏠 Menu Principal</button>
       </div>
+    </div>
+
+    <div id="screenCredits" class="screen hidden creditsScreen">
+      <div class="storyEyebrow">✨ SOBRE A AVENTURA</div>
+      <h2>Créditos</h2>
+      <div class="creditsCard">
+        <img src="assets/zeco/idle1.png" alt="Zeco" class="creditsZeco">
+        <div>
+          <h3>Zeco: Lendas da Ilha</h3>
+          <p>Uma aventura criada para PC e celular, com exploração, combate, gemas ancestrais e os mistérios da Ilha de Aruana.</p>
+          <div class="creditsTags"><span>Plataforma</span><span>Aventura</span><span>Offline</span></div>
+        </div>
+      </div>
+      <button id="creditsBackBtn" class="secondaryBtn">◀ Voltar</button>
     </div>
 
     <div id="screenEnd" class="screen hidden">

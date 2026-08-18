@@ -1,6 +1,6 @@
 // Service worker simples: cacheia os arquivos do jogo na instalação e serve
 // do cache quando offline, com atualização em segundo plano (stale-while-revalidate).
-const CACHE_NAME = 'zeco-ilha-das-gemas-v3';
+const CACHE_NAME = 'zeco-ilha-das-gemas-v4-2';
 const ASSETS = [
   './',
   './index.html',

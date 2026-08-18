@@ -108,7 +108,12 @@ document.addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
   if ([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(e.key.toLowerCase())) e.preventDefault();
   const k = e.key.toLowerCase();
-  if ((k === 'p' || k === 'escape') && state.running) {
+  if ((k === 'p' || k === 'escape') && state.running && !e.repeat) {
+    // ESC durante diálogo fecha o diálogo; não abre dois overlays ao mesmo tempo.
+    if (dialogueOpen) {
+      if (k === 'escape') closeDialogue();
+      return;
+    }
     if (typeof setPaused === 'function') setPaused(!state.paused);
     else state.paused = !state.paused;
   }
@@ -237,6 +242,19 @@ function drawFloatTexts() {
 }
 
 // ---------- Estado do jogo, jogador e carregamento de fase ----------
+// Alguns navegadores/modos privados podem bloquear localStorage completamente.
+// Centralizar o acesso evita que o jogo deixe de abrir por causa disso.
+function safeStorageGet(key, fallback=null) {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : value;
+  } catch (e) { return fallback; }
+}
+function safeStorageSet(key, value) {
+  try { localStorage.setItem(key, value); return true; }
+  catch (e) { return false; }
+}
+
 let state = {
   running: false,
   paused: false,
@@ -249,8 +267,8 @@ let state = {
   camX: 0,
   lastWon: false,
   lastPlayedLevel: 0,
-  cameraShake: localStorage.getItem('zeco_shake') !== '0',
-  showTips: localStorage.getItem('zeco_tips') !== '0',
+  cameraShake: safeStorageGet('zeco_shake', '1') !== '0',
+  showTips: safeStorageGet('zeco_tips', '1') !== '0',
   shake: {x:0, y:0, timer:0},
   levelProgress: levels.map(() => ({completed:false, objective:false})),
 };
@@ -262,7 +280,7 @@ const SAVE_KEY = 'zeco_save_v1';
 
 function saveProgress() {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({
+    safeStorageSet(SAVE_KEY, JSON.stringify({
       levelProgress: state.levelProgress,
       bestScore: state.bestScore,
       lastPlayedLevel: state.lastPlayedLevel,
@@ -272,7 +290,7 @@ function saveProgress() {
 
 function loadProgress() {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = safeStorageGet(SAVE_KEY);
     if (!raw) return;
     const data = JSON.parse(raw);
     if (Array.isArray(data.levelProgress)) {
@@ -343,7 +361,7 @@ function loadLevel(idx) {
   // O Barão Sombra é o chefe verdadeiro da fase 10. O portal fica selado até derrotá-lo.
   boss = (idx === levels.length - 1) ? {
     x: Math.max(900, lvl.portalX - 420), y: groundY - 74, w:58, h:74,
-    hp:8, maxHp:8, dir:-1, vx:0, invuln:0, attackTimer:120, phase:1, alive:true
+    hp:8, maxHp:8, dir:-1, vx:0, invuln:0, attackTimer:120, phase:1, alive:true, active:false
   } : null;
   portalX = lvl.portalX;
   worldWidth = lvl.worldWidth;
@@ -498,6 +516,15 @@ document.addEventListener('keydown', e => {
 
 function updateBoss() {
   if (!boss || !boss.alive) return;
+  // O chefe só entra em combate quando Zeco realmente chega à arena final.
+  // Antes disso ele não dispara projéteis atravessando metade da fase.
+  if (!boss.active) {
+    if (player.x + player.w < boss.x - 520) return;
+    boss.active = true;
+    boss.attackTimer = 75;
+    triggerShake(3);
+    spawnFloatText(boss.x + boss.w/2, boss.y - 14, 'BARÃO SOMBRA!', '#e7c6ff');
+  }
   if (boss.invuln > 0) boss.invuln--;
   boss.attackTimer--;
   const px = player.x + player.w/2;
@@ -528,10 +555,13 @@ function updateBoss() {
       spawnParticles(boss.x+boss.w/2,boss.y+28,20,{color:'#ffcf66',speed:4,life:28,gravity:0.08,size:3});
       spawnFloatText(boss.x+boss.w/2,boss.y-8,'-1','#ffd166');
       if (boss.hp<=0) {
-        boss.alive=false; state.score+=1000; updateHUD(); playWin(); triggerShake(12);
+        boss.alive=false;
+        bossProjectiles = []; // nenhum tiro antigo pode atingir Zeco depois da vitória
+        state.score+=1000; updateHUD(); playWin(); triggerShake(12);
         spawnParticles(boss.x+boss.w/2,boss.y+boss.h/2,50,{color:'#c48cff',speed:6,life:42,gravity:-0.02,size:4});
         spawnFloatText(boss.x+boss.w/2,boss.y-15,'BARÃO DERROTADO!','#fff1a8');
         openDialogue('Barão Sombra','Isso não termina aqui, Zeco... a ilha guarda segredos ainda mais antigos que eu.');
+        return;
       }
     }
   }
@@ -926,6 +956,8 @@ function loseLife() {
 function nextLevel() {
   const finishedIndex = state.levelIndex;
   state.levelProgress[finishedIndex].completed = true;
+  // "Continuar" deve apontar para a próxima fase liberada, não para a fase já concluída.
+  state.lastPlayedLevel = Math.max(state.lastPlayedLevel, Math.min(finishedIndex + 1, levels.length - 1));
   saveProgress();
   playWin();
   triggerShake(3);

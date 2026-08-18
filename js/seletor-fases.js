@@ -44,15 +44,22 @@ function renderLevelSelect() {
 
   levels.forEach((lvl, i) => {
     const progress = state.levelProgress[i];
+    const unlocked = i === 0 || progress.completed || !!(state.levelProgress[i-1] && state.levelProgress[i-1].completed);
     const tile = document.createElement('div');
     tile.className = 'levelTile';
+    tile.setAttribute('role', 'button');
+    tile.setAttribute('tabindex', unlocked ? '0' : '-1');
+    tile.setAttribute('aria-disabled', unlocked ? 'false' : 'true');
+    if (!unlocked) tile.classList.add('locked');
     if (progress.completed) tile.classList.add('completed');
     if (i === lsContext.justCompletedIndex) tile.classList.add('justCompleted');
     if (i === nextUpIndex) tile.classList.add('nextUp');
     tile.style.animationDelay = (i * 0.05) + 's';
 
     let badge = '';
-    if (i === lsContext.justCompletedIndex) {
+    if (!unlocked) {
+      badge = '<div class="tileBadge lockedBadge">🔒 BLOQUEADA</div>';
+    } else if (i === lsContext.justCompletedIndex) {
       badge = '<div class="tileBadge">NOVO 🔷</div>';
     } else if (i === nextUpIndex) {
       badge = '<div class="tileBadge next">PRÓXIMA ▶</div>';
@@ -67,10 +74,15 @@ function renderLevelSelect() {
         <div class="silverIcon${progress.objective ? ' earned' : ''}"></div>
       </div>
     `;
-    tile.addEventListener('click', () => {
+    const openTile = () => {
+      if (!unlocked) return;
       // Mostra um pequeno capítulo antes de entrar na fase. Além de dar contexto,
       // isso aproveita o seletor como mapa narrativo da ilha.
       showStoryForLevel(i, lsContext.continueRun);
+    };
+    tile.addEventListener('click', openTile);
+    tile.addEventListener('keydown', ev => {
+      if (unlocked && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openTile(); }
     });
     levelGrid.appendChild(tile);
   });
