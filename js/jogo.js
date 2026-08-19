@@ -64,6 +64,7 @@ const scoreDisplay = document.getElementById('scoreDisplay');
 const livesDisplay = document.getElementById('livesDisplay');
 const gemProgressDisplay = document.getElementById('gemProgressDisplay');
 const objectiveDisplay = document.getElementById('objectiveDisplay');
+const coinDisplay = document.getElementById('coinDisplay');
 const levelDisplay = document.getElementById('levelDisplay');
 const powerupStatus = document.getElementById('powerupStatus');
 const muteBtn = document.getElementById('muteBtn');
@@ -72,6 +73,21 @@ const overlay = document.getElementById('overlay');
 const screenMenu = document.getElementById('screenMenu');
 const screenHowTo = document.getElementById('screenHowTo');
 const screenEnd = document.getElementById('screenEnd');
+const screenLevelComplete = document.getElementById('screenLevelComplete');
+const completeChapter = document.getElementById('completeChapter');
+const completeTitle = document.getElementById('completeTitle');
+const completeStars = document.getElementById('completeStars');
+const completeGemStat = document.getElementById('completeGemStat');
+const completeSecretStat = document.getElementById('completeSecretStat');
+const completeTimeStat = document.getElementById('completeTimeStat');
+const completeLivesStat = document.getElementById('completeLivesStat');
+const completeScoreStat = document.getElementById('completeScoreStat');
+const completeBonusStat = document.getElementById('completeBonusStat');
+const completeGemGoal = document.getElementById('completeGemGoal');
+const completeSecretGoal = document.getElementById('completeSecretGoal');
+const completeNextBtn = document.getElementById('completeNextBtn');
+const completeReplayBtn = document.getElementById('completeReplayBtn');
+const completeMapBtn = document.getElementById('completeMapBtn');
 const screenLevelSelect = document.getElementById('screenLevelSelect');
 const levelGrid = document.getElementById('levelGrid');
 const overlayTitle = document.getElementById('overlayTitle');
@@ -85,6 +101,7 @@ const startBtn = document.getElementById('startBtn');
 const menuBtn = document.getElementById('menuBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const attackBtn = document.getElementById('attackBtn');
+const specialBtn = document.getElementById('specialBtn');
 const screenPause = document.getElementById('screenPause');
 const resumeBtn = document.getElementById('resumeBtn');
 const restartLevelBtn = document.getElementById('restartLevelBtn');
@@ -93,6 +110,7 @@ const pauseLevelText = document.getElementById('pauseLevelText');
 const dialogueBox = document.getElementById('dialogueBox');
 const dialogueName = document.getElementById('dialogueName');
 const dialogueText = document.getElementById('dialogueText');
+const dialoguePortrait = document.getElementById('dialoguePortrait');
 const dialogueNext = document.getElementById('dialogueNext');
 
 const GRAVITY = 0.6;
@@ -142,6 +160,7 @@ bindTouchBtn(document.getElementById('leftBtn'), 'arrowleft');
 bindTouchBtn(document.getElementById('rightBtn'), 'arrowright');
 bindTouchBtn(document.getElementById('jumpBtn'), ' ');
 bindTouchBtn(document.getElementById('attackBtn'), 'x');
+if (specialBtn) bindTouchBtn(specialBtn, 'c');
 
 function clearInputState() {
   keys = {};
@@ -268,6 +287,8 @@ let state = {
   lastWon: false,
   lastPlayedLevel: 0,
   cameraShake: safeStorageGet('zeco_shake', '1') !== '0',
+  coins: 0,
+  unlockedThrow: false,
   showTips: safeStorageGet('zeco_tips', '1') !== '0',
   shake: {x:0, y:0, timer:0},
   levelProgress: levels.map(() => ({completed:false, objective:false})),
@@ -284,6 +305,8 @@ function saveProgress() {
       levelProgress: state.levelProgress,
       bestScore: state.bestScore,
       lastPlayedLevel: state.lastPlayedLevel,
+      coins: state.coins,
+      unlockedThrow: state.unlockedThrow,
     }));
   } catch (e) { /* localStorage indisponível (modo privado, etc.) — ignora */ }
 }
@@ -301,6 +324,8 @@ function loadProgress() {
       }));
     }
     if (typeof data.bestScore === 'number') state.bestScore = data.bestScore;
+    if (typeof data.coins === 'number') state.coins = Math.max(0, data.coins|0);
+    state.unlockedThrow = !!data.unlockedThrow || state.coins >= 20;
     if (Number.isInteger(data.lastPlayedLevel)) state.lastPlayedLevel = Math.max(0, Math.min(data.lastPlayedLevel, levels.length - 1));
   } catch (e) { /* dados corrompidos — ignora e começa do zero */ }
   updateBestScoreDisplay();
@@ -317,14 +342,28 @@ function updateBestScoreDisplay() {
 
 let player, gems, enemies, portalX, worldWidth, groundY, platforms, spikes, powerups, boxes, silverGem, checkpoints;
 let boss = null;
+const mestreTupiSprites = { idle:new Image(), talk:new Image() };
+mestreTupiSprites.idle.src='assets/tupi/idle.png';
+mestreTupiSprites.talk.src='assets/tupi/talk.png';
+const linaSprites = { idle:new Image(), talk:new Image(), map:new Image() };
+linaSprites.idle.src='assets/lina/idle.png';
+linaSprites.talk.src='assets/lina/talk.png';
+linaSprites.map.src='assets/lina/map.png';
 let npc = null;
 let dialogueOpen = false;
 let dialogueSeen = {};
 let bossProjectiles = [];
+let specialProjectiles = [];
+let chests = [];
+let miniBoss = null;
 let jumpKeyPrev = false;
 let attackKeyPrev = false;
 let lastCheckpoint = null; // {x,y} do último checkpoint tocado na fase atual, ou null
 let riddenPlatform = null; // plataforma móvel em que o jogador está em pé no frame atual, ou null
+
+// Estatísticas da fase atual para a tela de resultado.
+let levelRunStats = { startScore:0, startClock:0, gemsCollected:0, totalGems:0, deaths:0, objectiveAtStart:false };
+let lastCompleteResult = null;
 
 // Relógio de jogo: ao contrário de Date.now(), só avança enquanto o jogo
 // não está pausado. Usado para toda animação/física que depende de tempo
@@ -346,7 +385,7 @@ function loadLevel(idx) {
   groundY = lvl.groundY;
   platforms = lvl.platforms.map(p => ({...p, baseX:p.x, baseY:p.y, dx:0, dy:0}));
   gems = lvl.gems.map(g => ({...g, taken:false}));
-  enemies = lvl.enemies.map(e => ({...e, alive:true, x:e.x}));
+  enemies = lvl.enemies.map((e,i) => ({...e, alive:true, x:e.x, baseY:e.y, hp:1, archetype:['walker','hopper','charger','floater'][state.levelIndex%4]}));
   spikes = lvl.spikes.map(s => ({...s}));
   boxes = lvl.boxes.map(b => ({...b, broken:false}));
   powerups = lvl.powerups.map(p => ({...p, taken:false}));
@@ -358,6 +397,11 @@ function loadLevel(idx) {
   dialogueOpen = false;
   if (dialogueBox) dialogueBox.classList.add('hidden');
   bossProjectiles = [];
+  specialProjectiles = [];
+  // Baú secreto por região: recompensa moedas permanentes.
+  chests = [{x: Math.max(280, Math.min(lvl.portalX-650, Math.floor(lvl.worldWidth*0.62))), y: groundY-30, w:34, h:30, opened:false}];
+  // Miniboss nas fases 3, 6 e 9.
+  miniBoss = ([2,5,8].includes(idx)) ? {x:Math.max(650,lvl.portalX-520),y:groundY-48,w:46,h:48,hp:3,maxHp:3,alive:true,invuln:0,dir:-1,baseX:Math.max(650,lvl.portalX-520),range:150} : null;
   // O Barão Sombra é o chefe verdadeiro da fase 10. O portal fica selado até derrotá-lo.
   boss = (idx === levels.length - 1) ? {
     x: Math.max(900, lvl.portalX - 420), y: groundY - 74, w:58, h:74,
@@ -385,11 +429,21 @@ function loadLevel(idx) {
     hurtTimer: 0,
     attackTimer: 0,
     attackCooldown: 0,
+    specialTimer: 0,
+    specialCooldown: 0,
   };
   particles = [];
   state.camX = 0;
   state.paused = false;
   riddenPlatform = null;
+  levelRunStats = {
+    startScore: state.score,
+    startClock: gameClock,
+    gemsCollected: 0,
+    totalGems: lvl.gems.length,
+    deaths: 0,
+    objectiveAtStart: !!(state.levelProgress[idx] && state.levelProgress[idx].objective),
+  };
   levelDisplay.textContent = 'Fase ' + (idx+1) + (typeof ZECO_LEVEL_NAMES !== 'undefined' ? ' · ' + ZECO_LEVEL_NAMES[idx] : '');
   updatePowerupHUD();
 }
@@ -412,6 +466,7 @@ function updateHUD() {
   gemProgressDisplay.textContent = '💗 ' + state.gemStreak + '/100';
   const totalObjectives = state.levelProgress.filter(p => p.objective).length;
   objectiveDisplay.textContent = '🥈 ' + totalObjectives + '/' + levels.length;
+  if (coinDisplay) coinDisplay.textContent = '🪙 ' + state.coins;
 }
 
 function updatePowerupHUD() {
@@ -480,6 +535,9 @@ function breakBox(box) {
   spawnParticles(box.x+box.w/2, box.y+box.h/2, 12, {color:'#a9662f', speed:3.5, life:24, gravity:0.25, size:3});
   if (box.contents === 'coin') {
     state.score += 15;
+    state.coins += 1;
+    if (!state.unlockedThrow && state.coins >= 20) { state.unlockedThrow = true; spawnFloatText(player.x+player.w/2, player.y-18, 'ADAGA LIBERADA! C / ✦', '#fff1a8'); }
+    saveProgress();
     playCoin();
     spawnParticles(box.x+box.w/2, box.y, 8, {color:'#ffd166', speed:2.5, life:20, gravity:-0.02, size:2.5});
     updateHUD();
@@ -500,11 +558,28 @@ function openDialogue(name, text) {
   clearInputState();
   dialogueName.textContent = name;
   dialogueText.textContent = text;
+  if (dialoguePortrait) {
+    let src = '';
+    if (name === 'Mestre Tupi') src = 'assets/tupi/talk.png';
+    else if (name === 'Lina, a Cartógrafa') src = 'assets/lina/talk.png';
+    if (src) {
+      dialoguePortrait.src = src;
+      dialoguePortrait.classList.remove('hidden');
+      dialogueBox.classList.add('hasPortrait');
+    } else {
+      dialoguePortrait.classList.add('hidden');
+      dialogueBox.classList.remove('hasPortrait');
+    }
+  }
   dialogueBox.classList.remove('hidden');
 }
 function closeDialogue() {
   dialogueOpen = false;
-  if (dialogueBox) dialogueBox.classList.add('hidden');
+  if (dialogueBox) {
+    dialogueBox.classList.add('hidden');
+    dialogueBox.classList.remove('hasPortrait');
+  }
+  if (dialoguePortrait) dialoguePortrait.classList.add('hidden');
   clearInputState();
 }
 if (dialogueNext) dialogueNext.addEventListener('click', closeDialogue);
@@ -632,6 +707,15 @@ function update() {
     player.attackCooldown = 20;
     if (typeof playAttack === 'function') playAttack();
   }
+  const specialHeld = !!(keys['c'] || keys['l']);
+  if (player.specialCooldown > 0) player.specialCooldown--;
+  if (player.specialTimer > 0) player.specialTimer--;
+  if (specialHeld && !player._specialPrev && state.unlockedThrow && player.specialCooldown <= 0) {
+    player.specialTimer = 18; player.specialCooldown = 45;
+    specialProjectiles.push({x:player.x+player.w/2+player.facing*20,y:player.y+15,vx:player.facing*8,life:80,w:18,h:8});
+    if (typeof playAttack === 'function') playAttack();
+  }
+  player._specialPrev = specialHeld;
 
   if (jumpPressed && player.onGround) {
     // Pulo normal a partir do chão
@@ -805,6 +889,7 @@ function update() {
         playCoin();
         spawnParticles(g.x, g.y, 8, {color:'#ff5fa2', speed:2.5, life:22, gravity:0.08, size:2.5});
         state.gemStreak++;
+        levelRunStats.gemsCollected++;
         if (state.gemStreak >= 100) {
           state.gemStreak -= 100;
           state.lives++;
@@ -851,7 +936,14 @@ function update() {
   // Enemies
   for (const e of enemies) {
     if (!e.alive) continue;
-    e.x += e.dir * 1.6;
+    const archetype=e.archetype||'walker';
+    if (archetype==='hopper') {
+      e.x += e.dir*1.35; e.y = e.baseY - Math.abs(Math.sin(gameClock*2.6+e.baseX))*28;
+    } else if (archetype==='charger') {
+      const near=Math.abs(player.x-e.x)<180; e.x += e.dir*(near?3.0:1.1);
+    } else if (archetype==='floater') {
+      e.x += e.dir*1.45; e.y = e.baseY-38 + Math.sin(gameClock*2+e.baseX)*22;
+    } else e.x += e.dir * 1.6;
     if (e.x > e.baseX + e.range) e.dir = -1;
     if (e.x < e.baseX - e.range) e.dir = 1;
 
@@ -886,6 +978,31 @@ function update() {
         return;
       }
     }
+  }
+
+  // Adaga arremessada (ataque especial do sprite throw).
+  for (let i=specialProjectiles.length-1;i>=0;i--) {
+    const p=specialProjectiles[i]; p.x+=p.vx; p.life--;
+    let hit=false;
+    const pb={x:p.x-p.w/2,y:p.y-p.h/2,w:p.w,h:p.h};
+    for (const e of enemies) if(e.alive && rectsOverlap(pb,{x:e.x-16,y:e.y-24,w:32,h:24})) { e.alive=false; state.score+=40; hit=true; spawnParticles(e.x,e.y-14,12,{color:'#ffe08a',speed:3,life:20,gravity:.08,size:3}); break; }
+    if (miniBoss && miniBoss.alive && rectsOverlap(pb,miniBoss) && miniBoss.invuln<=0) { miniBoss.hp--; miniBoss.invuln=18; hit=true; triggerShake(4); if(miniBoss.hp<=0){miniBoss.alive=false;state.score+=250;state.coins+=5;saveProgress();spawnFloatText(miniBoss.x,miniBoss.y-18,'MINIBOSS +5 🪙','#fff1a8');} }
+    if(hit || p.life<=0 || p.x<0 || p.x>worldWidth) specialProjectiles.splice(i,1);
+  }
+
+  // Baús secretos: ataque corpo a corpo abre e entrega moedas permanentes.
+  for (const c of chests) if(!c.opened) {
+    const cb={x:c.x,y:c.y,w:c.w,h:c.h};
+    if(player.attackTimer>5){ const reach=42; const ab=player.facing>0?{x:player.x+player.w-4,y:player.y+4,w:reach,h:player.h-6}:{x:player.x-reach+4,y:player.y+4,w:reach,h:player.h-6}; if(rectsOverlap(ab,cb)){c.opened=true;state.coins+=5;state.score+=75;if(!state.unlockedThrow&&state.coins>=20)state.unlockedThrow=true;saveProgress();updateHUD();spawnParticles(c.x+17,c.y,18,{color:'#ffd166',speed:4,life:28,gravity:.08,size:3});spawnFloatText(c.x+17,c.y-18,'+5 🪙','#ffd166');}}
+  }
+
+  // Minibosses regionais.
+  if(miniBoss && miniBoss.alive){
+    if(miniBoss.invuln>0) miniBoss.invuln--; miniBoss.dir=player.x<miniBoss.x?-1:1;
+    miniBoss.x += miniBoss.dir*(Math.abs(player.x-miniBoss.x)<240?1.65:.7); miniBoss.x=Math.max(miniBoss.baseX-miniBoss.range,Math.min(miniBoss.x,miniBoss.baseX+miniBoss.range));
+    const mb={x:miniBoss.x,y:miniBoss.y,w:miniBoss.w,h:miniBoss.h};
+    if(player.attackTimer>5&&miniBoss.invuln<=0){const reach=46;const ab=player.facing>0?{x:player.x+player.w-4,y:player.y,w:reach,h:player.h}:{x:player.x-reach+4,y:player.y,w:reach,h:player.h};if(rectsOverlap(ab,mb)){miniBoss.hp--;miniBoss.invuln=20;triggerShake(5);spawnFloatText(miniBoss.x+20,miniBoss.y-8,'-1','#ffd166');if(miniBoss.hp<=0){miniBoss.alive=false;state.score+=250;state.coins+=5;saveProgress();updateHUD();spawnParticles(miniBoss.x+22,miniBoss.y+20,28,{color:'#ff9f43',speed:5,life:34,gravity:.1,size:4});}}}
+    if(rectsOverlap(player,mb)&&player.invuln===0&&player.starTimer===0){damagePlayer();return;}
   }
 
   updateBoss();
@@ -934,6 +1051,7 @@ function triggerShake(amount) {
 
 function loseLife() {
   state.lives--;
+  levelRunStats.deaths++;
   player.hurtTimer = 18;
   playHurt();
   triggerShake(6);
@@ -953,6 +1071,67 @@ function loseLife() {
   }
 }
 
+function formatRunTime(seconds) {
+  const total = Math.max(0, Math.round(seconds));
+  const min = Math.floor(total / 60);
+  const sec = total % 60;
+  return min + ':' + String(sec).padStart(2, '0');
+}
+
+function showLevelComplete(finishedIndex) {
+  state.running = false;
+  clearInputState();
+
+  const totalGems = levelRunStats.totalGems || 0;
+  const gemsGot = Math.min(levelRunStats.gemsCollected, totalGems);
+  const gemRatio = totalGems ? gemsGot / totalGems : 1;
+  const secretFound = !!(state.levelProgress[finishedIndex] && state.levelProgress[finishedIndex].objective);
+  const secretNew = secretFound && !levelRunStats.objectiveAtStart;
+  const elapsed = Math.max(0, gameClock - levelRunStats.startClock);
+  const levelPoints = Math.max(0, state.score - levelRunStats.startScore);
+
+  // 1 estrela por concluir, +1 pela exploração, +1 pelo segredo da fase.
+  const stars = 1 + (gemRatio >= 0.70 ? 1 : 0) + (secretFound ? 1 : 0);
+  const bonus = (stars * 100) + (levelRunStats.deaths === 0 ? 150 : 0) + (secretNew ? 100 : 0);
+  state.score += bonus;
+  updateHUD();
+
+  lastCompleteResult = { finishedIndex, stars, bonus, elapsed, gemsGot, totalGems, secretFound, levelPoints, deaths:levelRunStats.deaths };
+
+  overlay.classList.remove('hidden');
+  if (typeof hideAllScreens === 'function') hideAllScreens();
+  else {
+    [screenMenu, screenHowTo, screenEnd, screenLevelSelect].forEach(el => el && el.classList.add('hidden'));
+  }
+  screenLevelComplete.classList.remove('hidden');
+
+  completeChapter.textContent = 'CAPÍTULO ' + (finishedIndex + 1) + ' CONCLUÍDO';
+  completeTitle.textContent = (typeof ZECO_LEVEL_NAMES !== 'undefined' && ZECO_LEVEL_NAMES[finishedIndex]) || ('Fase ' + (finishedIndex + 1));
+  completeGemStat.textContent = gemsGot + '/' + totalGems;
+  completeSecretStat.textContent = secretFound ? 'Encontrado' : 'Não';
+  completeTimeStat.textContent = formatRunTime(elapsed);
+  completeLivesStat.textContent = Math.max(0, state.lives);
+  completeScoreStat.textContent = levelPoints;
+  completeBonusStat.textContent = '+' + bonus;
+
+  const starEls = completeStars ? [...completeStars.querySelectorAll('span')] : [];
+  starEls.forEach((el, i) => {
+    el.textContent = i < stars ? '★' : '☆';
+    el.classList.toggle('earned', i < stars);
+  });
+  completeGemGoal.classList.toggle('done', gemRatio >= 0.70);
+  completeSecretGoal.classList.toggle('done', secretFound);
+
+  const finalLevel = finishedIndex >= levels.length - 1;
+  completeNextBtn.textContent = finalLevel ? 'Ver Epílogo ▶' : 'Próxima Região ▶';
+  saveProgress();
+  if (state.score > state.bestScore) {
+    state.bestScore = state.score;
+    saveProgress();
+    updateBestScoreDisplay();
+  }
+}
+
 function nextLevel() {
   const finishedIndex = state.levelIndex;
   state.levelProgress[finishedIndex].completed = true;
@@ -962,18 +1141,43 @@ function nextLevel() {
   playWin();
   triggerShake(3);
   spawnParticles(player.x + player.w/2, player.y + player.h/2, 22, {color:'#ffd166', speed:4, life:34, gravity:-0.03, size:3.5});
-
-  if (finishedIndex + 1 >= levels.length) {
-    // Última fase concluída: mostra a tela de vitória
-    gameOver(true);
-    return;
-  }
-
-  // Ao terminar uma fase (que não seja a última), leva para o seletor de fases
-  // em vez de carregar a próxima automaticamente.
-  state.running = false;
-  openLevelSelect({ continueRun: true, justCompletedIndex: finishedIndex });
+  showLevelComplete(finishedIndex);
 }
+
+if (completeNextBtn) completeNextBtn.addEventListener('click', () => {
+  if (!lastCompleteResult) return;
+  const idx = lastCompleteResult.finishedIndex;
+  if (idx >= levels.length - 1) {
+    screenLevelComplete.classList.add('hidden');
+    gameOver(true);
+  } else if (typeof showLevelTransition === 'function') {
+    showLevelTransition(idx + 1, true);
+  } else {
+    state.levelIndex = idx + 1;
+    loadLevel(state.levelIndex);
+    state.running = true;
+    overlay.classList.add('hidden');
+  }
+});
+
+if (completeReplayBtn) completeReplayBtn.addEventListener('click', () => {
+  if (!lastCompleteResult) return;
+  const idx = lastCompleteResult.finishedIndex;
+  // Repetir a fase começa uma tentativa limpa para que estrelas/tempo sejam comparáveis.
+  resetGame(idx);
+  clearInputState();
+  overlay.classList.add('hidden');
+  screenLevelComplete.classList.add('hidden');
+  state.running = true;
+  state.paused = false;
+});
+
+if (completeMapBtn) completeMapBtn.addEventListener('click', () => {
+  screenLevelComplete.classList.add('hidden');
+  const mapButton = document.getElementById('islandMapBtn');
+  if (mapButton) mapButton.click();
+  else if (typeof openLevelSelect === 'function') openLevelSelect({continueRun:false, justCompletedIndex:null});
+});
 
 function gameOver(won) {
   state.running = false;
@@ -1790,9 +1994,10 @@ function drawGround() {
     ctx.save();
     ctx.translate(e.x, e.y+bob);
     ctx.scale(e.dir, 1);
-    ctx.fillStyle = theme.enemy;
+    const et=e.archetype||'walker';
+    ctx.fillStyle = et==='hopper'?'#5bbf78':et==='charger'?'#d85b47':et==='floater'?'#5b89d8':theme.enemy;
     ctx.beginPath();
-    ctx.ellipse(0,-12,16,12,0,0,Math.PI*2);
+    if(et==='floater') ctx.ellipse(0,-12,17,10,0,0,Math.PI*2); else if(et==='charger') ctx.roundRect(-18,-27,36,24,7); else ctx.ellipse(0,-12,16,12,0,0,Math.PI*2);
     ctx.fill();
     ctx.fillStyle = 'white';
     ctx.beginPath(); ctx.arc(6,-16,4,0,Math.PI*2); ctx.fill();
@@ -1805,15 +2010,51 @@ function drawGround() {
   }
 
 
-  // NPC narrativo
+  // Baús secretos
+  for(const c of chests){const x=c.x-state.camX,y=c.y;ctx.save();ctx.translate(x,y);ctx.fillStyle=c.opened?'#6d4c2f':'#9b622b';ctx.fillRect(0,8,34,22);ctx.fillStyle='#e4b94f';ctx.fillRect(0,6,34,6);ctx.fillRect(14,5,6,25);if(!c.opened){ctx.fillStyle='#fff1a8';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.fillText('?',17,0);}ctx.restore();}
+  // Miniboss regional
+  if(miniBoss&&miniBoss.alive){const x=miniBoss.x-state.camX,y=miniBoss.y;ctx.save();if(miniBoss.invuln>0&&miniBoss.invuln%4<2)ctx.globalAlpha=.45;ctx.translate(x+23,y+24);ctx.scale(miniBoss.dir,1);ctx.fillStyle='#7b2e2e';ctx.beginPath();ctx.roundRect(-23,-24,46,48,12);ctx.fill();ctx.fillStyle='#ffd166';ctx.beginPath();ctx.arc(-8,-8,4,0,Math.PI*2);ctx.arc(8,-8,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#382020';ctx.fillRect(-16,8,32,7);ctx.restore();const bw=80;ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(x-17,y-13,bw,7);ctx.fillStyle='#ff7b54';ctx.fillRect(x-17,y-13,bw*(miniBoss.hp/miniBoss.maxHp),7);}
+  // Adagas especiais
+  for(const p of specialProjectiles){const x=p.x-state.camX;ctx.save();ctx.translate(x,p.y);ctx.rotate(gameClock*12);ctx.fillStyle='#f6e7b0';ctx.fillRect(-9,-2,14,4);ctx.fillStyle='#b66b3d';ctx.fillRect(5,-3,6,6);ctx.restore();}
+
+
+  // NPCs narrativos com sprites próprios
   if (npc) {
-    const sx=npc.x-state.camX, sy=groundY-47;
-    ctx.save(); ctx.translate(sx,sy);
-    ctx.fillStyle='#e8d0a5'; ctx.beginPath(); ctx.arc(0,-20,10,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#4d8a63'; ctx.fillRect(-9,-10,18,24);
-    ctx.fillStyle='#d8b24c'; ctx.fillRect(-12,13,24,5);
-    ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
-    ctx.fillText('!',0,-38); ctx.restore();
+    const sx = npc.x - state.camX;
+    const isTupi = npc.name === 'Mestre Tupi';
+    const isLina = npc.name === 'Lina, a Cartógrafa';
+    let img = null;
+    let drawH = 0;
+    if (isTupi && mestreTupiSprites.idle.complete && mestreTupiSprites.idle.naturalWidth) {
+      img = (dialogueOpen && mestreTupiSprites.talk.complete && mestreTupiSprites.talk.naturalWidth) ? mestreTupiSprites.talk : mestreTupiSprites.idle;
+      drawH = 108;
+    } else if (isLina && linaSprites.idle.complete && linaSprites.idle.naturalWidth) {
+      img = (dialogueOpen && linaSprites.talk.complete && linaSprites.talk.naturalWidth) ? linaSprites.talk : linaSprites.idle;
+      drawH = 96;
+    }
+    if (img) {
+      const drawW = drawH * (img.naturalWidth / img.naturalHeight);
+      const bob = Math.sin(gameClock * 2.2 + npc.x * .01) * 1.5;
+      ctx.save();
+      ctx.shadowColor='rgba(0,0,0,.28)'; ctx.shadowBlur=8;
+      ctx.drawImage(img, sx-drawW/2, groundY-drawH+bob, drawW, drawH);
+      ctx.restore();
+      if (!npc.shown) {
+        ctx.save();
+        ctx.fillStyle='#fff7d6'; ctx.strokeStyle=isLina?'#2d6f78':'#7a3f20'; ctx.lineWidth=3;
+        ctx.beginPath(); ctx.arc(sx,groundY-drawH-10+bob,13,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle=isLina?'#147d8a':'#b02a2a'; ctx.font='bold 18px sans-serif'; ctx.textAlign='center';
+        ctx.fillText('!',sx,groundY-drawH-4+bob); ctx.restore();
+      }
+    } else {
+      const sy=groundY-47;
+      ctx.save(); ctx.translate(sx,sy);
+      ctx.fillStyle='#e8d0a5'; ctx.beginPath(); ctx.arc(0,-20,10,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#4d8a63'; ctx.fillRect(-9,-10,18,24);
+      ctx.fillStyle='#d8b24c'; ctx.fillRect(-12,13,24,5);
+      ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('!',0,-38); ctx.restore();
+    }
   }
 
   // Chefe final: Barão Sombra
@@ -1867,6 +2108,8 @@ function drawPlayer() {
   let spriteName = 'idle1';
   if (player.hurtTimer > 0) {
     spriteName = 'hurt';
+  } else if (player.specialTimer > 0) {
+    spriteName = 'throw';
   } else if (player.attackTimer > 0) {
     spriteName = 'attack';
   } else if (!player.onGround) {
@@ -1882,7 +2125,7 @@ function drawPlayer() {
   const img = ZECO_SPRITES[spriteName];
   if (img && img.complete && img.naturalWidth) {
     // Altura visual maior que o Zeco antigo, mantendo os pés presos ao chão.
-    const targetH = spriteName === 'hurt' ? 58 : (spriteName === 'jump' ? 72 : (spriteName === 'attack' ? 74 : 70));
+    const targetH = spriteName === 'hurt' ? 58 : (spriteName === 'jump' ? 72 : ((spriteName === 'attack' || spriteName === 'throw') ? 74 : 70));
     const targetW = targetH * (img.naturalWidth / img.naturalHeight);
     const bob = (spriteName.startsWith('idle')) ? Math.sin(gameClock * 3.2) * 0.8 : 0;
     ctx.drawImage(img, -targetW/2, -targetH + bob, targetW, targetH);

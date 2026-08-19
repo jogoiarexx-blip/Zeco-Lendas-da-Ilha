@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Zeco: Lendas da Ilha — v4.2</title>
+<title>Zeco: Lendas da Ilha — v4.5</title>
 <meta name="theme-color" content="#3a1e5c">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
@@ -19,6 +19,7 @@
         <span id="livesDisplay">❤️ 3</span>
         <span id="gemProgressDisplay">💗 0/100</span>
         <span id="objectiveDisplay">🥈 0/10</span>
+        <span id="coinDisplay">🪙 0</span>
         <span id="levelDisplay">Fase 1</span>
       </div>
       <div id="hudRight">
@@ -34,6 +35,7 @@
       </div>
       <div class="actionPad">
         <div class="touchBtn attackBtn" id="attackBtn" role="button" tabindex="0" aria-label="Atacar">⚔</div>
+        <div class="touchBtn attackBtn" id="specialBtn" role="button" tabindex="0" aria-label="Ataque especial">✦</div>
         <div class="touchBtn" id="jumpBtn" role="button" tabindex="0" aria-label="Pular">⤒</div>
       </div>
     </div>
@@ -41,6 +43,7 @@
 
 
   <div id="dialogueBox" class="dialogueBox hidden">
+    <img id="dialoguePortrait" class="dialoguePortrait hidden" alt="Retrato do personagem">
     <div id="dialogueName" class="dialogueName">Personagem</div>
     <div id="dialogueText" class="dialogueText">...</div>
     <button id="dialogueNext" class="dialogueNext">Continuar ▶</button>
@@ -113,7 +116,7 @@
 
           <div class="menuFooter">
             <span id="menuSaveStatus">● PROGRESSO SALVO LOCALMENTE</span>
-            <span>ZECO • v4.2</span>
+            <span>ZECO • v4.3</span>
           </div>
         </section>
       </div>
@@ -195,6 +198,40 @@
       </div>
     </div>
 
+
+    <div id="screenTransition" class="screen hidden transitionScreen">
+      <div id="transitionBackdrop" class="transitionBackdrop theme-ilha" aria-hidden="true">
+        <div class="transitionMoon"></div>
+        <div class="transitionMist mistA"></div>
+        <div class="transitionMist mistB"></div>
+        <div class="transitionRidge ridgeBack"></div>
+        <div class="transitionRidge ridgeFront"></div>
+        <div class="transitionSpark sparkA">✦</div>
+        <div class="transitionSpark sparkB">✦</div>
+        <div class="transitionSpark sparkC">✦</div>
+      </div>
+      <div class="transitionCard">
+        <div class="transitionCopy">
+          <div id="transitionChapter" class="transitionEyebrow">CAPÍTULO 1</div>
+          <div id="transitionNumber" class="transitionNumber">01</div>
+          <h2 id="transitionTitle">Costa dos Coqueiros</h2>
+          <p id="transitionText">A aventura começa na costa de Aruana.</p>
+          <div class="transitionHint"><span>💡</span><span id="transitionHintText">Colete gemas e procure caminhos secretos.</span></div>
+          <div class="transitionLoading">
+            <div class="transitionLoadingTop"><span>Preparando a região</span><b id="transitionPercent">0%</b></div>
+            <div class="transitionTrack"><div id="transitionFill" class="transitionFill"></div></div>
+          </div>
+          <button id="transitionStartBtn" class="transitionStartBtn" disabled>Entrar na região ▶</button>
+        </div>
+        <div class="transitionHero">
+          <div class="transitionHeroAura"></div>
+          <img id="transitionZeco" src="assets/zeco/run1.png" alt="Zeco">
+          <div class="transitionHeroShadow"></div>
+          <div class="transitionBadge"><small>DESTINO</small><b id="transitionDestination">Costa dos Coqueiros</b></div>
+        </div>
+      </div>
+    </div>
+
     <div id="screenCredits" class="screen hidden creditsScreen">
       <div class="storyEyebrow">✨ SOBRE A AVENTURA</div>
       <h2>Créditos</h2>
@@ -207,6 +244,51 @@
         </div>
       </div>
       <button id="creditsBackBtn" class="secondaryBtn">◀ Voltar</button>
+    </div>
+
+
+    <div id="screenLevelComplete" class="screen hidden levelCompleteScreen">
+      <div class="completeGlow"></div>
+      <div class="completeCard">
+        <div class="completeHero">
+          <div class="completeAura"></div>
+          <img src="assets/zeco/idle1.png" alt="Zeco comemorando" class="completeZeco">
+          <div class="completeHeroShadow"></div>
+          <div class="completeBadge">REGIÃO CONCLUÍDA</div>
+        </div>
+        <div class="completeContent">
+          <div class="completeEyebrow" id="completeChapter">CAPÍTULO 1</div>
+          <h2 id="completeTitle">Costa dos Coqueiros</h2>
+          <p class="completeSub">A luz da gema ancestral voltou a responder ao chamado de Zeco.</p>
+
+          <div class="completeStars" id="completeStars" aria-label="Desempenho da fase">
+            <span>☆</span><span>☆</span><span>☆</span>
+          </div>
+
+          <div class="completeStats">
+            <div class="completeStat"><span>💎</span><b id="completeGemStat">0/0</b><small>Gemas</small></div>
+            <div class="completeStat"><span>🥈</span><b id="completeSecretStat">Não</b><small>Segredo</small></div>
+            <div class="completeStat"><span>⏱️</span><b id="completeTimeStat">0:00</b><small>Tempo</small></div>
+            <div class="completeStat"><span>❤️</span><b id="completeLivesStat">3</b><small>Vidas</small></div>
+          </div>
+
+          <div class="completeScoreBox">
+            <div><small>PONTOS NA FASE</small><b id="completeScoreStat">0</b></div>
+            <div class="completeBonus"><small>BÔNUS</small><b id="completeBonusStat">+0</b></div>
+          </div>
+
+          <div class="completeObjectives">
+            <div id="completeGemGoal" class="completeGoal"><span>◆</span><div><b>Explorador</b><small>Coletar pelo menos 70% das gemas</small></div></div>
+            <div id="completeSecretGoal" class="completeGoal"><span>◆</span><div><b>Segredo da Ilha</b><small>Encontrar a gema prateada</small></div></div>
+          </div>
+
+          <div class="completeActions">
+            <button id="completeNextBtn">Próxima Região ▶</button>
+            <button id="completeReplayBtn" class="secondaryBtn">↻ Repetir Fase</button>
+            <button id="completeMapBtn" class="secondaryBtn">🗺️ Mapa</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="screenEnd" class="screen hidden">

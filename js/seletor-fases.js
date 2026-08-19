@@ -21,6 +21,7 @@ function openLevelSelect(opts = {}) {
   screenMenu.classList.add('hidden');
   screenHowTo.classList.add('hidden');
   screenEnd.classList.add('hidden');
+  if (screenLevelComplete) screenLevelComplete.classList.add('hidden');
   overlay.classList.remove('hidden');
   screenLevelSelect.classList.remove('hidden');
 }

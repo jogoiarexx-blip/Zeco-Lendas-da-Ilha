@@ -23,6 +23,18 @@ const islandMap = document.getElementById('islandMap');
 const creditsBtn = document.getElementById('creditsBtn');
 const creditsBackBtn = document.getElementById('creditsBackBtn');
 const screenCredits = document.getElementById('screenCredits');
+const screenTransition = document.getElementById('screenTransition');
+const transitionBackdrop = document.getElementById('transitionBackdrop');
+const transitionChapter = document.getElementById('transitionChapter');
+const transitionNumber = document.getElementById('transitionNumber');
+const transitionTitle = document.getElementById('transitionTitle');
+const transitionText = document.getElementById('transitionText');
+const transitionHintText = document.getElementById('transitionHintText');
+const transitionPercent = document.getElementById('transitionPercent');
+const transitionFill = document.getElementById('transitionFill');
+const transitionStartBtn = document.getElementById('transitionStartBtn');
+const transitionDestination = document.getElementById('transitionDestination');
+const transitionZeco = document.getElementById('transitionZeco');
 const menuProgressPercent = document.getElementById('menuProgressPercent');
 const menuProgressFill = document.getElementById('menuProgressFill');
 const menuCompletedStat = document.getElementById('menuCompletedStat');
@@ -36,7 +48,7 @@ let storyMode = 'browse'; // browse | start
 let pendingStart = null; // {level, continueRun}
 
 function hideAllScreens() {
-  [screenMenu, screenHowTo, screenEnd, screenLevelSelect, screenStory, screenSettings, screenPause, screenIslandMap, screenCredits]
+  [screenMenu, screenHowTo, screenEnd, screenLevelComplete, screenLevelSelect, screenStory, screenSettings, screenPause, screenIslandMap, screenCredits, screenTransition]
     .forEach(el => el && el.classList.add('hidden'));
 }
 
@@ -71,7 +83,32 @@ function showMainMenu() {
   updateBestScoreDisplay();
 }
 
-function beginLevel(levelIndex, continueRun=false) {
+let transitionPending = null;
+let transitionTimer = null;
+let transitionFrame = null;
+
+const ZECO_TRANSITION_HINTS = [
+  'Explore além do caminho principal: algumas gemas ficam em rotas escondidas.',
+  'Ataques e pulos bem cronometrados são mais seguros que correr sem parar.',
+  'No gelo, controle a velocidade antes das bordas e dos espinhos.',
+  'Use o ritmo das plataformas e do vento a seu favor.',
+  'A escuridão esconde perigos. Observe o cenário antes de avançar.',
+  'Nem todo brilho é decoração: procure sinais de caminhos secretos.',
+  'As ruínas guardam pistas sobre o passado do Barão Sombra.',
+  'No vulcão, movimento constante vale mais que pressa.',
+  'Nas ilhas flutuantes, planeje o salto antes de sair da plataforma.',
+  'O Barão Sombra tem padrões. Aprenda o ritmo antes de atacar.'
+];
+
+function getTransitionTheme(levelIndex) {
+  const raw = (levels[levelIndex] && levels[levelIndex].theme) || 'ilha';
+  return ({noite:'caverna', lava:'vulcao', lendaria:'apice'}[raw] || raw);
+}
+
+function startLevelNow(levelIndex, continueRun=false) {
+  if (transitionTimer) { clearInterval(transitionTimer); transitionTimer = null; }
+  if (transitionFrame) { cancelAnimationFrame(transitionFrame); transitionFrame = null; }
+  transitionPending = null;
   initAudio();
   goFullscreenLandscape();
   hideAllScreens();
@@ -89,6 +126,59 @@ function beginLevel(levelIndex, continueRun=false) {
   state.running = true;
   state.paused = false;
 }
+
+function showLevelTransition(levelIndex, continueRun=false) {
+  const idx = Math.max(0, Math.min(levelIndex, levels.length - 1));
+  transitionPending = { levelIndex: idx, continueRun };
+  state.running = false;
+  clearInputState();
+  hideAllScreens();
+  overlay.classList.remove('hidden');
+  screenTransition.classList.remove('hidden');
+
+  const story = (typeof getStoryForLevel === 'function') ? getStoryForLevel(idx) : null;
+  transitionChapter.textContent = 'CAPÍTULO ' + (idx + 1);
+  transitionNumber.textContent = String(idx + 1).padStart(2, '0');
+  transitionTitle.textContent = (typeof ZECO_LEVEL_NAMES !== 'undefined' && ZECO_LEVEL_NAMES[idx]) || ('Fase ' + (idx + 1));
+  transitionDestination.textContent = transitionTitle.textContent;
+  transitionText.textContent = story ? story.text : 'Uma nova região da Ilha de Aruana espera por Zeco.';
+  transitionHintText.textContent = ZECO_TRANSITION_HINTS[idx] || ZECO_TRANSITION_HINTS[0];
+
+  const theme = getTransitionTheme(idx);
+  transitionBackdrop.className = 'transitionBackdrop theme-' + theme;
+  transitionZeco.src = idx === levels.length - 1 ? 'assets/zeco/attack.png' : 'assets/zeco/run1.png';
+  transitionFill.style.width = '0%';
+  transitionPercent.textContent = '0%';
+  transitionStartBtn.disabled = true;
+  transitionStartBtn.textContent = idx === levels.length - 1 ? 'Enfrentar o Barão ▶' : 'Entrar na região ▶';
+
+  let progress = 0;
+  const startedAt = performance.now();
+  const duration = 1150;
+  const animate = (now) => {
+    const t = Math.min(1, (now - startedAt) / duration);
+    progress = Math.round((1 - Math.pow(1 - t, 3)) * 100);
+    transitionFill.style.width = progress + '%';
+    transitionPercent.textContent = progress + '%';
+    if (t < 1) transitionFrame = requestAnimationFrame(animate);
+    else {
+      transitionFrame = null;
+      transitionStartBtn.disabled = false;
+      transitionStartBtn.focus({preventScroll:true});
+    }
+  };
+  transitionFrame = requestAnimationFrame(animate);
+}
+
+function beginLevel(levelIndex, continueRun=false) {
+  showLevelTransition(levelIndex, continueRun);
+}
+
+if (transitionStartBtn) transitionStartBtn.addEventListener('click', () => {
+  if (!transitionPending || transitionStartBtn.disabled) return;
+  const p = transitionPending;
+  startLevelNow(p.levelIndex, p.continueRun);
+});
 
 function renderStory(index) {
   storyCursor = Math.max(0, Math.min(index, ZECO_STORY.length - 1));

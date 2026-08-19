@@ -1,6 +1,6 @@
 // Service worker simples: cacheia os arquivos do jogo na instalação e serve
 // do cache quando offline, com atualização em segundo plano (stale-while-revalidate).
-const CACHE_NAME = 'zeco-ilha-das-gemas-v4-2';
+const CACHE_NAME = 'zeco-ilha-das-gemas-v4-7-lina';
 const ASSETS = [
   './',
   './index.html',
@@ -24,6 +24,11 @@ const ASSETS = [
   './assets/zeco/crouch.png',
   './assets/zeco/hurt.png',
   './assets/zeco/dead.png',
+  './assets/tupi/idle.png',
+  './assets/tupi/talk.png',
+  './assets/lina/idle.png',
+  './assets/lina/talk.png',
+  './assets/lina/map.png',
 ];
 
 self.addEventListener('install', event => {
